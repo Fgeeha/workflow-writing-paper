@@ -185,3 +185,43 @@ def test_required_sections_match_by_stem(tmp_path):
     assert deterministic_checks(project, Artifact(type="novelty", body=body), rubric) == []
     issues = [b["issue"] for b in deterministic_checks(project, Artifact(type="novelty", body="## Гипотезы\nx"), rubric)]
     assert len(issues) == 5 and all("нет обязательного раздела" in i for i in issues)
+
+
+def test_failed_judge_is_replaced_by_next_candidate(tmp_path):
+    from workflow_writing_paper.review import review_artifact
+
+    pool = {**POOL, "providers": [*POOL["providers"], {"id": "judge-bad", "kind": "fake", "family": "z", "bad_json": 9}]}
+    pool["roles"] = {**POOL["roles"], "judge": ["judge-bad", "judge-x", "judge-y"]}
+    _ws, project = make(tmp_path, pool)
+    project.write_artifact("novelty", NOVELTY_OK, {"role": "ideator", "provider": "writer", "family": "a"})
+    res = review_artifact(project, "novelty")
+    assert res["accepted"] and set(res["reports"]) == {"judge-bad", "judge-x", "judge-y", "checker"}
+    assert res["reports"]["judge-bad"]["error"] and len(res["errors"]) == 1
+
+
+def test_review_and_assembly_stages(tmp_path):
+    ws, project = make(tmp_path)
+    by = {"role": "section_writer", "provider": "writer", "family": "a"}
+    project.write_artifact("novelty", NOVELTY_OK, by)
+    project.decide("novelty", "approve")
+    for st in ("literature", "experiment_plan"):
+        project.skip_stage(st, "тест")
+    body = "\n\n".join(f"## {s}\n\nТекст раздела без чисел." for s in project.sections())
+    project.write_artifact("draft", body, by)
+    assert project.stage_state("draft") == "done"
+    res = run_task(ws, enqueue(ws, "demo", "review"))
+    assert res["error"] is None and res["accepted"]
+    assert project.artifact("draft").status == "in_review"
+    try:
+        enqueue(ws, "demo", "assembly")
+        raise AssertionError("assembly до одобрения черновика")
+    except ValueError:
+        pass
+    project.decide("draft", "approve")
+    res = run_task(ws, enqueue(ws, "demo", "assembly"))
+    assert res["error"] is None and "paper.md" in res["outputs"]
+    assert (project.path / "paper.md").read_text().startswith("# demo")
+    assert project.artifact("paper").status == "approved" and project.stage_state("assembly") == "done"
+    # перепроверка любого артефакта без гейта
+    res = run_task(ws, enqueue(ws, "demo", "review", {"artifact": "novelty"}, gate=False))
+    assert res["error"] is None and res["accepted"]

@@ -81,6 +81,23 @@ def cmd_run(ws: Workspace, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_review(ws: Workspace, args: argparse.Namespace) -> int:
+    from .core.engine import enqueue, run_task
+
+    ws.load_env()
+    res = run_task(ws, enqueue(ws, args.slug, "review", {"artifact": args.artifact}, gate=False))
+    if res["error"]:
+        print(f"ошибка: {res['error']}", file=sys.stderr)
+        return 1
+    print(f"{args.artifact}: принято судьями: {res.get('accepted')}; min {res.get('min_overall')} / порог "
+          f"{res.get('threshold')}; блокеров {len(res.get('blockers', []))}; ошибок судей {len(res.get('errors', []))}")
+    for b in res.get("blockers", []):
+        print(f"  - [{b.get('judge')}] {b.get('issue')}")
+    for e in res.get("errors", []):
+        print(f"  ! {e}")
+    return 0
+
+
 def cmd_check(ws: Workspace, args: argparse.Namespace) -> int:
     from .core import Project
     from .review.checks import deterministic_checks
@@ -122,6 +139,9 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("stage")
     run.add_argument("--input", help="абзац новизны для стадии novelty")
     run.add_argument("--section", help="раздел для стадии draft")
+    review = sub.add_parser("review", help="перепроверить артефакт судьями без перегенерации")
+    review.add_argument("slug")
+    review.add_argument("artifact", nargs="?", default="draft")
     check = sub.add_parser("check", help="только детерминированные проверки артефактов")
     check.add_argument("slug")
     check.add_argument("artifacts", nargs="*")
@@ -129,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     ws = Workspace(args.workspace)
     handlers = {"init": cmd_init, "serve": cmd_serve, "bench": cmd_bench, "new": cmd_new, "run": cmd_run,
-                "check": cmd_check}
+                "check": cmd_check, "review": cmd_review}
     try:
         return handlers[args.cmd](ws, args)
     except (FileNotFoundError, FileExistsError, ValueError) as e:

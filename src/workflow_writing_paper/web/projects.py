@@ -177,6 +177,14 @@ def register(app: FastAPI, ws: Workspace, render: Render) -> None:
             raise HTTPException(400, str(e)) from e
         return RedirectResponse(f"/projects/{slug}/artifacts/{type_}", status_code=303)
 
+    @app.post("/projects/{slug}/artifacts/{type_}/review")
+    def rereview(slug: str, type_: str) -> RedirectResponse:
+        try:
+            enqueue(ws, slug, "review", {"artifact": type_}, gate=False)
+        except (ValueError, FileNotFoundError) as e:
+            raise HTTPException(400, str(e)) from e
+        return RedirectResponse(f"/projects/{slug}", status_code=303)
+
     @app.post("/projects/{slug}/artifacts/{type_}/to-eval")
     async def to_eval(slug: str, type_: str, request: Request) -> RedirectResponse:
         """Сохранить одобренный артефакт как эталонную задачу стенда для роли, которая его создала."""

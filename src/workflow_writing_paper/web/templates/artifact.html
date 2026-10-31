@@ -15,6 +15,7 @@
   <button name="decision" value="reject">отклонить</button>
   <input name="reason" placeholder="причина (обязательна для override)" size="40">
 </form>
+<form method="post" action="/projects/{{ project.slug }}/artifacts/{{ art.type }}/review"><button>перепроверить судьями</button></form>
 {% endif %}
 {% if art.status == 'approved' and art.version == current.version %}
 <form method="post" action="/projects/{{ project.slug }}/artifacts/{{ art.type }}/to-eval"><button>в эталоны стенда</button></form>

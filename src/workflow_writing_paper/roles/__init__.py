@@ -160,10 +160,12 @@ def stage_draft(project: Project, payload: dict[str, Any], task: str | None = No
 
 # --- review, assembly ----------------------------------------------------------------------
 def stage_review(project: Project, payload: dict[str, Any], task: str | None = None) -> dict[str, Any]:
-    if project.artifact("draft") is None:
-        raise StageError("черновика нет")
+    """Проверка целиком: по умолчанию draft; payload.artifact — перепроверить любой артефакт без перегенерации."""
+    type_ = str(payload.get("artifact") or "draft")
+    if project.artifact(type_) is None:
+        raise StageError(f"артефакта {type_} нет")
     try:
-        return review_artifact(project, "draft", task)
+        return review_artifact(project, type_, task)
     except ReviewError as e:
         raise StageError(str(e)) from e
 

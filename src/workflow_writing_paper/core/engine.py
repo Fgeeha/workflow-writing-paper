@@ -13,9 +13,10 @@ from .workspace import Workspace
 logger = logging.getLogger(__name__)
 
 
-def enqueue(ws: Workspace, slug: str, stage: str, payload: dict[str, Any] | None = None) -> int:
+def enqueue(ws: Workspace, slug: str, stage: str, payload: dict[str, Any] | None = None, gate: bool = True) -> int:
+    """Поставить стадию в очередь. `gate=False` — без проверки порядка стадий (перепроверка артефакта)."""
     project = Project.open(ws, slug)
-    ok, why = project.can_run(stage)
+    ok, why = project.can_run(stage) if gate else (True, "")
     if not ok:
         raise ValueError(why)
     ok, why = project.budget_left()

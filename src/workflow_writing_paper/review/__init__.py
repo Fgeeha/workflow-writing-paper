@@ -87,17 +87,22 @@ def review_artifact(project: Project, type_: str, task: str | None = None) -> di
     weights = rubric_weights(rubric)
     threshold = rubric_threshold(rubric, float(settings.get("threshold", 7.0)))
     author_family = str((art.meta.get("created_by") or {}).get("family", ""))
-    judges = pick_judges(pool, role_providers(cfg, "judge"), author_family, n)
-    if len(judges) < n:
-        raise ReviewError(f"нужно {n} судей из семейств, отличных от {author_family!r}; доступно {len(judges)}")
+    candidates = role_providers(cfg, "judge")
+    eligible = pick_judges(pool, candidates, author_family, len(candidates))  # все подходящие, по приоритету
+    if len(eligible) < n:
+        raise ReviewError(f"нужно {n} судей из семейств, отличных от {author_family!r}; доступно {len(eligible)}")
 
     reports: dict[str, dict[str, Any]] = {}
-    for judge in judges:
+    succeeded = 0
+    for judge in eligible:  # отказавший судья записывается, его место занимает следующий
+        if succeeded >= n:
+            break
         if isinstance(judge, DecisionProvider):
             rep = _decision_judge(judge, project, art, rubric, weights, threshold)
         else:
             rep = _text_judge(judge, project, art, rubric, weights, threshold, task)
         reports[judge.id] = {"judge": {"provider": judge.id, "family": judge.family}, **rep}
+        succeeded += rep["overall"] is not None
 
     checker_blockers = deterministic_checks(project, art, rubric)
     reports["checker"] = {"judge": {"provider": "checker", "family": "code"}, "scores": {}, "overall": None,

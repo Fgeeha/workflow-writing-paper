@@ -18,7 +18,7 @@ from .base import Message, Provider, ProviderError
 
 def _request(url: str, body: dict | bytes | None = None, headers: dict | None = None,
              timeout: float = 600, context: ssl.SSLContext | None = None) -> Any:
-    data = json.dumps(body).encode() if isinstance(body, dict) else body
+    data = json.dumps(body, ensure_ascii=False).encode() if isinstance(body, dict) else body
     hdrs = {"Content-Type": "application/json", **(headers or {})}
     req = urllib.request.Request(url, data=data, headers=hdrs, method="POST" if data else "GET")
     try:
