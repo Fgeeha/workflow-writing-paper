@@ -85,7 +85,7 @@
 │  └───┬──────────┴──────────────┴──────────────┴──────────────┴──────────────┘             │
 │      │                                                                                    │
 │  providers/     ollama · openai-compatible · openrouter · codex-cli · opencode-cli ·      │
-│                 generic-cli · gigachat · fake (для тестов)                                 │
+│                 claude-cli · generic-cli · gigachat · fake (тесты)                         │
 │      │                                                                                    │
 │  storage/       SQLite (индекс, очередь, журнал вызовов) + файлы workspace/ и проекта     │
 └───────────────────────────────────────────────────────────────────────────────────────────┘
@@ -96,7 +96,7 @@
 ```python
 class Provider(Protocol):
     id: str
-    family: str          # qwen, gemma, openai, gigachat, ...
+    family: str          # qwen, gemma, openai, anthropic, gigachat, ...
     def complete(self, messages: list[Message], *, json_schema: dict | None = None,
                  max_tokens: int, temperature: float, seed: int | None) -> Completion
 ```
@@ -214,6 +214,11 @@ providers:
     exclusive_group: local-gpu
     enabled: false
     params: {temperature: 0.7, top_p: 0.8, top_k: 20, presence_penalty: 1.0}
+  - id: claude
+    kind: claude-cli
+    family: anthropic
+    model: sonnet
+    price: {input_per_1m: 0, output_per_1m: 0}   # подписка CLI
   - id: codex
     kind: codex-cli
     family: openai
@@ -242,7 +247,7 @@ profiles:                    # быстрые переключатели в ин
   quality:    {ideator: codex, section_writer: codex}
 ```
 
-Поле `kind` — адаптер: `ollama`, `openai`, `codex-cli`, `opencode-cli`, `generic-cli` (любой консольный агент, команда и разбор вывода из конфига),
+Поле `kind` — адаптер: `ollama`, `openai`, `codex-cli`, `opencode-cli`, `claude-cli`, `generic-cli` (любой консольный агент, команда и разбор вывода из конфига),
 `gigachat`, `fake`. Поле `family` — семейство для правила «чужие проверяют».
 
 ### 6.2. `paper-workflow.yaml`
@@ -479,7 +484,7 @@ wwp gc [--older-than 90d]             очистка журнала вызово
 ### v0.1 — пул провайдеров и стенд
 
 - `providers/` с адаптерами ollama, openai-compatible, openrouter, codex-cli, opencode-cli,
-  generic-cli, gigachat, fake; единый `Provider`; таблица цен; `exclusive_group`.
+  claude-cli, generic-cli, gigachat, fake; единый `Provider`; таблица цен; `exclusive_group`.
 - `eval/`: задачи, прогон, судьи других семейств, оценка автора, таблица роль × модель.
 - Веб: страницы «Пул моделей», «Стенд», «Журнал вызовов».
 - Готово, когда: на этой машине сравнение трёх локальных моделей на роли `critic` даёт таблицу,
