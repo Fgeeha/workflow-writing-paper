@@ -41,6 +41,7 @@ uv run pytest              # тесты на провайдере fake, без G
 `opencode-cli`, `generic-cli` (любой консольный агент), `fake`.
 
 Результаты прогонов стенда и решения по выбору моделей — [docs/BENCH-LOG.md](docs/BENCH-LOG.md).
+Сравнение с аналогами (Claude Science, K-Dense BYOK, Denario и др.) и решение об их месте — [docs/ANALOGS.md](docs/ANALOGS.md).
 Эталонные задачи стенда — `workspace/eval/tasks/<роль>/*.yaml`, рубрики — `workspace/rubrics/`,
 промпты ролей — `workspace/prompts/<язык>/`.
 
