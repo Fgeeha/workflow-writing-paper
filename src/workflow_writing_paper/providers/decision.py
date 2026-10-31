@@ -11,8 +11,8 @@ from .base import Message, Provider, ProviderError
 from .http import _request
 
 # Уровни шкалы критерия; текст легенды — что означает каждый уровень.
-LEVELS = {"0": "критерий не выполнен", "1": "выполнен слабо", "2": "выполнен частично",
-          "3": "выполнен в основном", "4": "выполнен полностью"}
+LEVELS = ["критерий не выполнен", "выполнен слабо", "выполнен частично", "выполнен в основном",
+          "выполнен полностью"]
 
 
 class DecisionProvider(Provider):
@@ -30,8 +30,8 @@ class DecisionProvider(Provider):
 
     def score(self, state: str, criteria: dict[str, str]) -> tuple[dict[str, Any], int]:
         """Оценить `state` по критериям {код: описание}. Возвращает ({код: {score 0–10, probabilities}}, токены)."""
-        questions = {code: {"type": "score", "question": f"Насколько ответ соответствует критерию: {text}",
-                            "legend": LEVELS} for code, text in criteria.items()}
+        questions = {code: {"type": "score", "instructions": f"Насколько ответ модели соответствует критерию: {text}",
+                            "criteria": LEVELS} for code, text in criteria.items()}
         body = {"model": self.model, "state": state, "questions": questions}
         with self._slot():
             resp = _request(self.url + "/v1/systemone", body, timeout=self.cfg.get("timeout", 300))
