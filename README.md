@@ -27,8 +27,11 @@ uv run wwp bench --role critic --providers ollama-gemma4-12b,ollama-qwen3-14b,ol
 uv run pytest              # тесты на провайдере fake, без GPU и ключей
 ```
 
-Провайдеры (`kind`): `ollama`, `openai` (любой OpenAI-совместимый сервер), `openrouter`, `gigachat`,
-`codex-cli`, `claude-cli`, `opencode-cli`, `generic-cli` (любой консольный агент), `fake`.
+Провайдеры (`kind`): `ollama`, `ollama-decision` (decision-модели ollama вроде `kev` — только как судьи),
+`openai` (любой OpenAI-совместимый сервер), `openrouter`, `gigachat`, `codex-cli`, `claude-cli`,
+`opencode-cli`, `generic-cli` (любой консольный агент), `fake`.
+
+Результаты прогонов стенда и решения по выбору моделей — [docs/BENCH-LOG.md](docs/BENCH-LOG.md).
 Эталонные задачи стенда — `workspace/eval/tasks/<роль>/*.yaml`, рубрики — `workspace/rubrics/`,
 промпты ролей — `workspace/prompts/<язык>/`.
 

@@ -52,6 +52,21 @@ providers:
     exclusive_group: local-gpu
     num_ctx: 32768
 
+  - id: ollama-gpt-oss-20b
+    kind: ollama
+    family: openai
+    model: gpt-oss:20b
+    gpu: true
+    exclusive_group: local-gpu
+    num_ctx: 32768
+  - id: ollama-phi4-reasoning-14b
+    kind: ollama
+    family: microsoft
+    model: phi4-reasoning:14b
+    gpu: true
+    exclusive_group: local-gpu
+    num_ctx: 32768
+
   - id: kev-9b
     kind: ollama-decision
     family: qwen             # база Qwen3.5/3.8 — не судит модели семейства qwen
