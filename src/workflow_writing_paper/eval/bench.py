@@ -16,62 +16,19 @@ import yaml
 from ..core import Workspace
 from ..providers import Provider, ProviderError, build_pool, call_logged, pick_judges, role_providers
 from ..providers.decision import DecisionProvider
+from ..review.rubric import (
+    LANGUAGE_MIN_SHARE,
+    judge_schema,
+    language_share,
+    rubric_criteria,
+    rubric_weights,
+    weighted_overall,
+)
 
 logger = logging.getLogger(__name__)
 
-LANGUAGE_MIN_SHARE = 0.8  # меньшая доля букв языка задачи — ответ не на том языке
 
 _WORD = re.compile(r"\w+", re.UNICODE)
-_RUBRIC_ROW = re.compile(r"^\|\s*(C\d+)\s*\|(.*)\|\s*([\d.]+)\s*\|\s*$", re.MULTILINE)
-_CYR = re.compile(r"[а-яё]", re.IGNORECASE)
-_LAT = re.compile(r"[a-z]", re.IGNORECASE)
-
-
-def language_share(text: str, language: str) -> float:
-    """Доля букв языка задачи среди кириллицы и латиницы; 1.0 — ответ целиком на языке задачи."""
-    cyr, lat = len(_CYR.findall(text)), len(_LAT.findall(text))
-    if cyr + lat == 0:
-        return 1.0
-    return (cyr if language == "ru" else lat) / (cyr + lat)
-
-
-def rubric_criteria(rubric: str) -> dict[str, str]:
-    """Коды и формулировки критериев из таблицы рубрики."""
-    return {code: text.strip() for code, text, _ in _RUBRIC_ROW.findall(rubric)}
-
-
-def rubric_weights(rubric: str) -> dict[str, float]:
-    """Коды и веса критериев из таблицы рубрики: строки вида `| C1 | критерий | 0.4 |`."""
-    weights = {code: float(w) for code, _, w in _RUBRIC_ROW.findall(rubric)}
-    if not weights:
-        raise ValueError("в рубрике нет строк критериев вида | C1 | … | вес |")
-    return weights
-
-
-def judge_schema(weights: dict[str, float]) -> dict[str, Any]:
-    """Целое 0–10 по каждому критерию; итог судья не ставит — его считает код по весам."""
-    crit = {"type": "integer", "minimum": 0, "maximum": 10}
-    return {
-        "type": "object",
-        "properties": {
-            "scores": {"type": "object", "properties": dict.fromkeys(weights, crit), "required": list(weights)},
-            "comments": {"type": "array", "items": {"type": "string"}},
-        },
-        "required": ["scores", "comments"],
-    }
-
-
-def weighted_overall(scores: Any, weights: dict[str, float]) -> float | None:
-    """Взвешенная оценка 0–10; None, если критерия нет или оценка вне шкалы."""
-    if not isinstance(scores, dict):
-        return None
-    vals: dict[str, float] = {}
-    for k in weights:
-        v = scores.get(k)
-        if not isinstance(v, (int, float)) or not 0 <= v <= 10:
-            return None
-        vals[k] = float(v)
-    return round(sum(vals[k] * w for k, w in weights.items()) / sum(weights.values()), 2)
 
 
 def _stems(text: str) -> set[str]:

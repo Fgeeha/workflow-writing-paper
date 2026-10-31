@@ -1,0 +1,6 @@
+id: generic
+language: ru
+sections: [Введение, Постановка задачи, Метод, Эксперимент, Обсуждение, Заключение]
+limits: {abstract_words: 250, body_pages: 12, references_min: 15}
+citation_style: gost-2008
+numbers: {decimal_separator: ",", rounding: 2}

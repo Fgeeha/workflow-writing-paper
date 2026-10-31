@@ -18,6 +18,17 @@ CREATE TABLE IF NOT EXISTS calls (
     prompt_path TEXT, tokens_in INTEGER, tokens_out INTEGER, duration_ms INTEGER,
     cost_usd REAL, error TEXT, created_at TEXT DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS projects (
+    slug TEXT PRIMARY KEY, path TEXT, template TEXT, created_at TEXT DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS tasks (
+    id INTEGER PRIMARY KEY, project TEXT, stage TEXT, role TEXT, status TEXT, payload TEXT, result TEXT,
+    created_at TEXT DEFAULT (datetime('now')), started_at TEXT, finished_at TEXT, error TEXT
+);
+CREATE TABLE IF NOT EXISTS approvals (
+    id INTEGER PRIMARY KEY, project TEXT, artifact TEXT, version INTEGER, decision TEXT, override_reason TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS bench_runs (
     id INTEGER PRIMARY KEY, run TEXT, role TEXT, task TEXT, provider TEXT, family TEXT,
     answer_path TEXT, judge_scores TEXT, judge_overall REAL, coverage REAL, human_score INTEGER,

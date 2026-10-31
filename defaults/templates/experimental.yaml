@@ -1,0 +1,9 @@
+# Экспериментальная статья: новизна → литература → план экспериментов → эксперименты → черновик → проверка → сборка
+stages:
+  - {id: novelty,         required: true}
+  - {id: literature,      required: false}   # v0.3; пока пропускается с причиной
+  - {id: experiment_plan, required: false}   # v0.3
+  - {id: experiments,     required: false}   # v0.4; числа можно вносить в реестр вручную
+  - {id: draft,           required: true}
+  - {id: review,          required: true}
+  - {id: assembly,        required: true}
