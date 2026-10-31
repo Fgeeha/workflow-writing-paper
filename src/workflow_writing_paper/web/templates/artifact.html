@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}{{ project.slug }} · {{ art.type }} v{{ art.version }}{% endblock %}
+{% block content %}
+<p><a href="/projects/{{ project.slug }}">← {{ project.slug }}</a></p>
+<h1>{{ art.type }} v{{ art.version }} <span class="{{ 'ok' if art.status == 'approved' else 'bad' if art.status in ('rejected','stale') else 'muted' }}">{{ art.status }}</span></h1>
+<p class="muted">Автор: {{ art.meta.created_by.role }} · {{ art.meta.created_by.provider }} ({{ art.meta.created_by.family }}).
+  Версии: {% for v in versions %}<a href="?version={{ v }}">{% if v == art.version %}<b>v{{ v }}</b>{% else %}v{{ v }}{% endif %}</a> {% endfor %}
+  {% if art.meta.approved_at %}· одобрен {{ art.meta.approved_at }}{% if art.meta.override_reason %} (override: {{ art.meta.override_reason }}){% endif %}{% endif %}</p>
+
+{% if art.version == current.version and art.status in ('in_review', 'draft', 'stale') %}
+<form method="post" action="/projects/{{ project.slug }}/artifacts/{{ art.type }}/decide" class="rec">
+  <button name="decision" value="approve">одобрить</button>
+  <button name="decision" value="override">одобрить с override</button>
+  <button name="decision" value="return">вернуть на правку</button>
+  <button name="decision" value="reject">отклонить</button>
+  <input name="reason" placeholder="причина (обязательна для override)" size="40">
+</form>
+{% endif %}
+{% if art.status == 'approved' and art.version == current.version %}
+<form method="post" action="/projects/{{ project.slug }}/artifacts/{{ art.type }}/to-eval"><button>в эталоны стенда</button></form>
+{% endif %}
+
+<h2>Проверки</h2>
+{% for r in reviews %}
+<details {% if r.blockers or r.error %}open{% endif %}>
+  <summary><b>{{ r.judge.provider }}</b> ({{ r.judge.family }}) —
+    {% if r.overall is not none %}{{ '%.1f'|format(r.overall) }} · {{ r.verdict }}{% elif r.judge.provider == 'checker' %}{{ r.verdict }}{% else %}<span class="bad">{{ r.error }}</span>{% endif %}
+    {% if r.blockers %}· <span class="bad">блокеров: {{ r.blockers|length }}</span>{% endif %}</summary>
+  {% if r.scores %}<p class="muted">{% for k, v in r.scores.items() %}{{ k }}={{ v }} {% endfor %}</p>{% endif %}
+  {% for b in r.blockers %}<p class="bad">строка {{ b.line or '?' }}: {{ b.issue }}{% if b.quote %} — «{{ b.quote }}»{% endif %}{% if b.fix %} → {{ b.fix }}{% endif %}</p>{% endfor %}
+  {% for c in r.comments %}<p>• {{ c }}</p>{% endfor %}
+</details>
+{% else %}<p class="muted">Проверок не было.</p>{% endfor %}
+
+<h2>Текст</h2>
+<pre>{{ art.body }}</pre>
+
+{% if diff %}
+<h2>Отличия от v{{ art.version - 1 }}</h2>
+<pre>{{ diff }}</pre>
+{% endif %}
+{% endblock %}

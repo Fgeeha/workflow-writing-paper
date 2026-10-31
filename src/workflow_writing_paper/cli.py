@@ -52,6 +52,53 @@ def cmd_bench(ws: Workspace, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_new(ws: Workspace, args: argparse.Namespace) -> int:
+    from .core import Project
+
+    project = Project.create(ws, args.slug, template=args.template, path=args.path, language=args.language,
+                             journal=args.journal)
+    print(f"проект {project.slug}: {project.path}")
+    return 0
+
+
+def cmd_run(ws: Workspace, args: argparse.Namespace) -> int:
+    from .core.engine import enqueue, run_task
+
+    ws.load_env()
+    payload: dict[str, str] = {}
+    if args.input:
+        payload["input"] = args.input
+    if args.section:
+        payload["section"] = args.section
+    tid = enqueue(ws, args.slug, args.stage, payload)
+    res = run_task(ws, tid)
+    if res["error"]:
+        print(f"задача {tid}: ошибка: {res['error']}", file=sys.stderr)
+        return 1
+    print(f"задача {tid}: готово; принято судьями: {res.get('accepted')}; блокеров: {len(res.get('blockers', []))}")
+    for b in res.get("blockers", []):
+        print(f"  - [{b.get('judge')}] строка {b.get('line', '?')}: {b.get('issue')}")
+    return 0
+
+
+def cmd_check(ws: Workspace, args: argparse.Namespace) -> int:
+    from .core import Project
+    from .review.checks import deterministic_checks
+
+    project = Project.open(ws, args.slug)
+    code = 0
+    for type_ in args.artifacts or ("novelty", "draft"):
+        art = project.artifact(type_)
+        if art is None:
+            continue
+        blockers = deterministic_checks(project, art, ws.text(f"rubrics/{type_}.md"))
+        print(f"{type_} v{art.version}: блокеров {len(blockers)}")
+        for b in blockers:
+            print(f"  - строка {b['line']}: {b['issue']}" + (f" — «{b['quote']}»" if b.get("quote") else ""))
+        code |= bool(blockers)
+    return code
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="wwp", description="Конвейер написания научных статей")
     parser.add_argument("--workspace", help="папка workspace (по умолчанию ./workspace или $WWP_WORKSPACE)")
@@ -64,13 +111,28 @@ def main(argv: list[str] | None = None) -> int:
     bench.add_argument("--role", required=True)
     bench.add_argument("--providers", help="id через запятую; по умолчанию назначенные на роль")
     bench.add_argument("--judges", type=int, default=2, help="число судей других семейств")
+    new = sub.add_parser("new", help="создать проект-статью")
+    new.add_argument("slug")
+    new.add_argument("--template", default="experimental")
+    new.add_argument("--journal", default="generic")
+    new.add_argument("--language", default="ru")
+    new.add_argument("--path", help="внешний каталог проекта")
+    run = sub.add_parser("run", help="выполнить стадию проекта (синхронно, без сервера)")
+    run.add_argument("slug")
+    run.add_argument("stage")
+    run.add_argument("--input", help="абзац новизны для стадии novelty")
+    run.add_argument("--section", help="раздел для стадии draft")
+    check = sub.add_parser("check", help="только детерминированные проверки артефактов")
+    check.add_argument("slug")
+    check.add_argument("artifacts", nargs="*")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     ws = Workspace(args.workspace)
-    handlers = {"init": cmd_init, "serve": cmd_serve, "bench": cmd_bench}
+    handlers = {"init": cmd_init, "serve": cmd_serve, "bench": cmd_bench, "new": cmd_new, "run": cmd_run,
+                "check": cmd_check}
     try:
         return handlers[args.cmd](ws, args)
-    except (FileNotFoundError, ValueError) as e:
+    except (FileNotFoundError, FileExistsError, ValueError) as e:
         print(f"ошибка: {e}", file=sys.stderr)
         return 2
 

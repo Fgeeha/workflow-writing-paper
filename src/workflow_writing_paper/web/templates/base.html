@@ -18,14 +18,18 @@
     .ok { color: #2a7a3b; } .bad { color: #b3261e; } .muted { color: #777; }
     .rec { background: #e6f2e8; padding: .5rem .8rem; border-left: 4px solid #2a7a3b; }
     button { cursor: pointer; }
+    details { margin: .4rem 0; } textarea { font: inherit; }
   </style>
 </head>
 <body>
 <nav>
   <b style="color:#fff">wwp</b>
+  <a href="/">Главная</a>
+  <a href="/projects">Проекты</a>
   <a href="/pool">Пул моделей</a>
   <a href="/bench">Стенд</a>
   <a href="/calls">Журнал вызовов</a>
+  <a href="/settings">Настройки</a>
 </nav>
 <main>{% block content %}{% endblock %}</main>
 </body>

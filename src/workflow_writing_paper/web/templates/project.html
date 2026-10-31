@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}{{ project.slug }}{% endblock %}
+{% block content %}
+<h1>{{ project.slug }}{% if project.manifest.title %} — {{ project.manifest.title }}{% endif %}</h1>
+<p class="muted">{{ project.path }} · шаблон {{ project.manifest.template }} · журнал {{ project.manifest.journal }} · язык {{ project.language }}
+  · <a href="/projects/{{ project.slug }}/registry">реестр результатов</a></p>
+<p>Бюджет: токены {{ spent.tokens|int }} / {{ budget.tokens }}, ${{ '%.3f'|format(spent.usd) }} / {{ budget.usd }}</p>
+
+<h2>Стадии</h2>
+<table>
+  <tr><th>стадия</th><th>обяз.</th><th>состояние</th><th>артефакт</th><th>действие</th></tr>
+  {% for s in stages %}
+  <tr>
+    <td>{{ s.id }}</td><td>{{ 'да' if s.required else 'нет' }}</td>
+    <td class="{{ 'ok' if s.state in ('done','skipped') else 'bad' if s.state == 'stale' else '' }}">{{ s.state }}{% if s.skipped %} <span class="muted">({{ s.skipped }})</span>{% endif %}</td>
+    <td>{% if s.artifact %}<a href="/projects/{{ project.slug }}/artifacts/{{ s.artifact.type }}">{{ s.artifact.type }} v{{ s.artifact.version }} · {{ s.artifact.status }}</a>{% endif %}</td>
+    <td>
+      {% if s.not_yet %}<span class="muted">появится в {{ s.not_yet }}</span>
+        {% if not s.skipped %}<form method="post" action="/projects/{{ project.slug }}/skip/{{ s.id }}" style="display:inline"> <input name="reason" placeholder="причина пропуска" size="18"><button>пропустить</button></form>{% endif %}
+      {% elif not s.can_run %}<span class="muted">{{ s.why }}</span>
+      {% elif s.id == 'novelty' %}
+        <form method="post" action="/projects/{{ project.slug }}/run/novelty">
+          <textarea name="input" rows="3" cols="60" placeholder="Абзац новизны от автора (пусто — переработать текущую версию)"></textarea>
+          <button>запустить</button></form>
+      {% elif s.id == 'draft' %}
+        <form method="post" action="/projects/{{ project.slug }}/run/draft">
+          <select name="section">{% for sec in sections %}<option value="{{ sec.name }}">{{ sec.name }}{% if sec.written %} ✓{% endif %}</option>{% endfor %}</select>
+          <button>написать раздел</button></form>
+      {% else %}
+        <form method="post" action="/projects/{{ project.slug }}/run/{{ s.id }}" style="display:inline"><button>запустить</button></form>
+        {% if not s.required and not s.skipped %}<form method="post" action="/projects/{{ project.slug }}/skip/{{ s.id }}" style="display:inline"><input name="reason" placeholder="причина" size="12"><button>пропустить</button></form>{% endif %}
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h2>Задачи</h2>
+<table>
+  <tr><th>#</th><th>стадия</th><th>статус</th><th>данные</th><th>итог</th><th>когда</th></tr>
+  {% for t in tasks %}
+  <tr><td>{{ t.id }}</td><td>{{ t.stage }}</td>
+      <td class="{{ 'ok' if t.status == 'done' else 'bad' if t.status == 'failed' else '' }}">{{ t.status }}</td>
+      <td class="muted">{{ t.payload|truncate(60) }}</td>
+      <td>{% if t.error %}<span class="bad">{{ t.error }}</span>{% else %}<span class="muted">{{ (t.result or '')|truncate(90) }}</span>{% endif %}</td>
+      <td class="muted">{{ t.finished_at or t.created_at }}</td></tr>
+  {% else %}<tr><td colspan="6" class="muted">Задач не было.</td></tr>{% endfor %}
+</table>
+{% endblock %}

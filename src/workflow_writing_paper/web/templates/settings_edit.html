@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ rel }}{% endblock %}
+{% block content %}
+<p><a href="/settings">← настройки</a></p>
+<h1><code>{{ rel }}</code></h1>
+<form method="post" action="/settings/edit">
+  <input type="hidden" name="rel" value="{{ rel }}">
+  <textarea name="text" rows="30" style="width:100%;font-family:monospace">{{ text }}</textarea>
+  <p><button>Сохранить в workspace</button></p>
+</form>
+{% endblock %}

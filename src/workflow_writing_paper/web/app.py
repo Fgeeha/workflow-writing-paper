@@ -1,4 +1,4 @@
-"""Веб-интерфейс v0.1: пул моделей, стенд, журнал вызовов."""
+"""Веб-интерфейс: пул моделей, стенд, журнал вызовов (здесь); проекты и артефакты — web/projects.py."""
 
 from __future__ import annotations
 
@@ -15,16 +15,19 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from ..core import Workspace
+from ..core.engine import Worker
 from ..eval import run_bench, summary
 from ..providers import build_pool, role_providers
 
 logger = logging.getLogger(__name__)
 
 
-def create_app(ws: Workspace | None = None) -> FastAPI:
+def create_app(ws: Workspace | None = None, worker: bool = True) -> FastAPI:
     ws = ws or Workspace()
     ws.load_env()
     app = FastAPI(title="workflow-writing-paper")
+    if worker:
+        Worker(ws).start()
     templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
     jobs: dict[str, dict[str, Any]] = {}
 
@@ -32,10 +35,6 @@ def create_app(ws: Workspace | None = None) -> FastAPI:
         return templates.TemplateResponse(request, name, ctx)
 
     # --- пул моделей ------------------------------------------------------------------
-    @app.get("/")
-    def index() -> RedirectResponse:
-        return RedirectResponse("/pool")
-
     @app.get("/pool")
     def pool_page(request: Request) -> HTMLResponse:
         cfg = ws.config()
@@ -202,4 +201,7 @@ def create_app(ws: Workspace | None = None) -> FastAPI:
         blocks.insert(0, ("параметры", json.dumps(meta, ensure_ascii=False, indent=2, default=str)))
         return render(request, "call.html", title=f"Вызов {cid} · {row['role']} · {row['provider']}", blocks=blocks)
 
+    from .projects import register
+
+    register(app, ws, render)
     return app

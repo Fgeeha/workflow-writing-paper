@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ project.slug }} · реестр{% endblock %}
+{% block content %}
+<p><a href="/projects/{{ project.slug }}">← {{ project.slug }}</a></p>
+<h1>Реестр результатов</h1>
+<p class="muted">Единственный источник чисел для текста статьи. Пишут сюда парсер сценариев (v0.4) и эта форма.</p>
+<table>
+  <tr><th>ключ</th><th>значение</th><th>ед.</th><th>источник</th><th>когда</th><th>примечание</th></tr>
+  {% for k, v in data.items() %}
+  <tr><td><code>{{ k }}</code></td><td class="num">{{ v.value }}</td><td>{{ v.unit }}</td><td>{{ v.source }}</td>
+      <td class="muted">{{ v.run }}</td><td class="muted">{{ v.note }}</td></tr>
+  {% else %}<tr><td colspan="6" class="muted">Пусто.</td></tr>{% endfor %}
+</table>
+<h2>Ручной ввод</h2>
+<form method="post" action="/projects/{{ project.slug }}/registry">
+  ключ <input name="key" required pattern="[A-Za-z0-9_]+" placeholder="latency_p50_ms">
+  значение <input name="value" required placeholder="103.32" size="10">
+  ед. <input name="unit" size="6" placeholder="ms">
+  примечание <input name="note" size="30">
+  <button>записать</button>
+</form>
+{% if scenarios %}<h2>Сценарии экспериментов</h2><pre>{{ scenarios }}</pre>{% endif %}
+{% endblock %}

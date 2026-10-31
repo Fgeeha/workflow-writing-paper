@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Проекты{% endblock %}
+{% block content %}
+<h1>Проекты</h1>
+<table>
+  <tr><th>проект</th><th>шаблон</th><th>каталог</th><th></th></tr>
+  {% for p in projects %}
+  <tr>
+    <td><a href="/projects/{{ p.slug }}">{{ p.slug }}</a></td><td>{{ p.template }}</td>
+    <td class="muted">{{ p.path }}</td>
+    <td>{% if p.missing %}<form method="post" action="/projects/{{ p.slug }}/path" style="display:inline">
+          <span class="bad">каталог отсутствует</span> <input name="path" placeholder="новый путь" size="30"> <button>указать</button></form>{% endif %}</td>
+  </tr>
+  {% else %}<tr><td colspan="4" class="muted">Проектов нет.</td></tr>{% endfor %}
+</table>
+
+<h2>Новый проект</h2>
+<form method="post" action="/projects">
+  <p>slug <input name="slug" required pattern="[A-Za-z0-9_-]+" placeholder="edge-plant-disease"></p>
+  <p>шаблон <select name="template">{% for t in templates %}<option>{{ t }}</option>{% endfor %}</select>
+     журнал <select name="journal">{% for j in journals %}<option>{{ j }}</option>{% endfor %}</select>
+     язык <select name="language"><option>ru</option><option>en</option></select></p>
+  <p>внешний каталог (необязательно) <input name="path" size="50" placeholder="/path/to/existing/paper-repo"></p>
+  <button type="submit">Создать</button>
+</form>
+{% endblock %}

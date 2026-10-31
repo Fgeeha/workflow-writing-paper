@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Настройки{% endblock %}
+{% block content %}
+<h1>Настройки</h1>
+<p class="muted">Промпты, рубрики, профили журналов, шаблоны проектов, эталонные задачи, запрещённые фразы. Файл из defaults правится копией в workspace.</p>
+<table>
+  <tr><th>файл</th><th>источник</th></tr>
+  {% for f in files %}
+  <tr><td><a href="/settings/edit?rel={{ f.rel }}">{{ f.rel }}</a></td><td class="muted">{{ 'workspace' if f.overridden else 'defaults' }}</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

@@ -5,8 +5,8 @@
 план экспериментов и черновик статьи; каждый артефакт проверяют модели других семейств,
 а принимает человек. Статьи размечаются привязкой к главам и становятся контурами диссертации.
 
-Состояние: v0.1 — пул провайдеров и стенд сравнения моделей. Техническое задание —
-[docs/PLAN.md](docs/PLAN.md).
+Состояние: v0.2 — проекты, стадии, артефакты, проверка семействами, реестр результатов.
+Техническое задание — [docs/PLAN.md](docs/PLAN.md).
 
 ## Принципы
 
@@ -24,8 +24,17 @@ uv run wwp init            # создаёт workspace/ из defaults/
 # заполнить workspace/env и workspace/providers.yaml
 uv run wwp serve           # http://127.0.0.1:8765: пул моделей, стенд, журнал вызовов
 uv run wwp bench --role critic --providers ollama-gemma4-12b,ollama-qwen3-14b,ollama-lfm25-8b
+uv run wwp new my-paper --template experimental   # проект в workspace/projects/my-paper
+uv run wwp run my-paper novelty --input "абзац новизны"   # стадия без сервера
+uv run wwp check my-paper  # только детерминированные проверки
 uv run pytest              # тесты на провайдере fake, без GPU и ключей
 ```
+
+Сквозной путь v0.2: автор вводит новизну → ideator → critic → ideator → `novelty.md` → два судьи
+других семейств + детерминированный `checker` → решение автора (одобрить / override / вернуть /
+отклонить) → разделы черновика по профилю журнала с числами только из `results.json` →
+`review` → `assembly` (`paper.md`, `paper.docx` через pandoc). Стадии `literature`,
+`experiment_plan`, `experiments` появятся в v0.3–v0.4, пока пропускаются с указанием причины.
 
 Провайдеры (`kind`): `ollama`, `ollama-decision` (decision-модели ollama вроде `kev` — только как судьи),
 `openai` (любой OpenAI-совместимый сервер), `openrouter`, `gigachat`, `codex-cli`, `claude-cli`,

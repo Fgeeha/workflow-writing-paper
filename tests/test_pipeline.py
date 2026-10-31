@@ -135,3 +135,39 @@ def test_stale_and_decisions(tmp_path):
     assert (project.path / "artifacts" / "history" / "novelty.v1.md").exists()
     rows = ws.db().execute("SELECT decision FROM approvals ORDER BY id").fetchall()
     assert [r["decision"] for r in rows] == ["approve", "override"]
+
+
+def test_web_pages_end_to_end(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from workflow_writing_paper.web import create_app
+
+    ws, _ = make(tmp_path)
+    client = TestClient(create_app(ws, worker=False))
+    assert client.get("/").status_code == 200
+    r = client.post("/projects", data={"slug": "web-demo", "template": "survey", "journal": "generic",
+                                       "language": "ru"}, follow_redirects=False)
+    assert r.status_code == 303
+    page = client.get("/projects/web-demo").text
+    assert "novelty" in page and "pending" in page
+    r = client.post("/projects/web-demo/run/novelty", data={"input": "Идея."}, follow_redirects=False)
+    assert r.status_code == 303 and run_pending(ws) == 1
+    assert client.post("/projects/web-demo/run/draft", data={"section": "Метод"}).status_code == 400  # гейт
+    home = client.get("/").text
+    assert "web-demo" in home and "решить" in home
+    art_page = client.get("/projects/web-demo/artifacts/novelty").text
+    assert "judge-x" in art_page and "checker" in art_page and "одобрить" in art_page
+    assert client.post("/projects/web-demo/artifacts/novelty/decide", data={"decision": "override"}).status_code == 400
+    r = client.post("/projects/web-demo/artifacts/novelty/decide", data={"decision": "approve"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert client.post("/projects/web-demo/artifacts/novelty/to-eval", follow_redirects=False).status_code == 303
+    assert list((ws.root / "eval" / "tasks" / "ideator").glob("ideator-web-demo-*.yaml"))
+    r = client.post("/projects/web-demo/registry", data={"key": "f1", "value": "0,82", "unit": ""},
+                    follow_redirects=False)
+    assert r.status_code == 303 and "0.82" in client.get("/projects/web-demo/registry").text
+    assert client.post("/projects/web-demo/registry", data={"key": "x", "value": "abc"}).status_code == 400
+    assert "prompts/ru/judge.md" in client.get("/settings").text
+    assert client.get("/settings/edit?rel=../etc/passwd").status_code == 400
+    r = client.post("/settings/edit", data={"rel": "rubrics/novelty.md", "text": "# x\n| C1 | a | 1 |\n"},
+                    follow_redirects=False)
+    assert r.status_code == 303 and (ws.root / "rubrics" / "novelty.md").read_text().startswith("# x")

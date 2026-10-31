@@ -66,7 +66,7 @@ def test_bench_not_enough_foreign_judges(tmp_path):
 def test_web_pages(tmp_path):
     ws = make_ws(tmp_path)
     run_bench(ws, "critic", ["cand-b"])
-    client = TestClient(create_app(ws))
+    client = TestClient(create_app(ws, worker=False))
     assert "cand-a" in client.get("/pool").text
     assert "доступен" in client.get("/pool/ping/cand-a").text
     assert client.post("/pool/profile/p", follow_redirects=False).status_code == 303
