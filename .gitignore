@@ -1,0 +1,22 @@
+# рабочая папка приложения: ключи, провайдеры, библиотека, проекты, журнал вызовов
+workspace/
+*.env
+env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+
+# служебные каталоги
+.claude/
+.claude-flow/
+.serena/
+.idea/
+.vscode/
+.DS_Store
