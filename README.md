@@ -5,7 +5,8 @@
 план экспериментов и черновик статьи; каждый артефакт проверяют модели других семейств,
 а принимает человек. Статьи размечаются привязкой к главам и становятся контурами диссертации.
 
-Состояние: план. Кода нет. Техническое задание — [docs/PLAN.md](docs/PLAN.md).
+Состояние: v0.1 — пул провайдеров и стенд сравнения моделей. Техническое задание —
+[docs/PLAN.md](docs/PLAN.md).
 
 ## Принципы
 
@@ -15,14 +16,21 @@
 - Семейство модели, создавшей артефакт, не участвует в его проверке.
 - Минимум зависимостей: FastAPI, Jinja2, HTMX, SQLite, pymupdf, PyYAML.
 
-## Как будет запускаться
+## Запуск
 
 ```bash
 uv sync
 uv run wwp init            # создаёт workspace/ из defaults/
 # заполнить workspace/env и workspace/providers.yaml
-uv run wwp serve           # http://127.0.0.1:8765
+uv run wwp serve           # http://127.0.0.1:8765: пул моделей, стенд, журнал вызовов
+uv run wwp bench --role critic --providers ollama-gemma4-12b,ollama-qwen3-14b,ollama-lfm25-8b
+uv run pytest              # тесты на провайдере fake, без GPU и ключей
 ```
+
+Провайдеры (`kind`): `ollama`, `openai` (любой OpenAI-совместимый сервер), `openrouter`, `gigachat`,
+`codex-cli`, `claude-cli`, `opencode-cli`, `generic-cli` (любой консольный агент), `fake`.
+Эталонные задачи стенда — `workspace/eval/tasks/<роль>/*.yaml`, рубрики — `workspace/rubrics/`,
+промпты ролей — `workspace/prompts/<язык>/`.
 
 Всё состояние — провайдеры, ключи, промпты, рубрики, библиотека, проекты, журнал вызовов —
 лежит в `workspace/` (в `.gitignore`). Переезд на другую машину — копирование одной папки.

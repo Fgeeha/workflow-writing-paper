@@ -1,0 +1,99 @@
+# Пул провайдеров. Копируется в workspace/providers.yaml командой `wwp init`; правьте копию.
+# kind: ollama | openai | openrouter | gigachat | codex-cli | claude-cli | opencode-cli | generic-cli | fake
+# family — семейство модели: судья не проверяет работу своего семейства. Дистилляты относите к семейству учителя.
+# gpu: true — вызовы строго по одному; exclusive_group — провайдеры, которые нельзя гонять одновременно.
+
+providers:
+  - id: ollama-gemma4-12b
+    kind: ollama
+    family: gemma
+    model: gemma4:12b
+    url: http://127.0.0.1:11434
+    gpu: true
+    exclusive_group: local-gpu
+    num_ctx: 32768
+  - id: ollama-qwen3-14b
+    kind: ollama
+    family: qwen
+    model: qwen3:14b
+    gpu: true
+    exclusive_group: local-gpu
+    num_ctx: 32768
+    think: false
+  - id: ollama-lfm25-8b
+    kind: ollama
+    family: liquid
+    model: lfm2.5:8b
+    gpu: true
+    exclusive_group: local-gpu
+    num_ctx: 32768
+    think: true            # рассуждает всегда; true отделяет рассуждение от ответа
+    params: {num_predict: 8192}
+  - id: ollama-yandexgpt5-8b
+    kind: ollama
+    family: yandex
+    model: hf.co/yandex/YandexGPT-5-Lite-8B-instruct-GGUF:Q4_K_M
+    gpu: true
+    exclusive_group: local-gpu
+    num_ctx: 32768
+  - id: ollama-gemma3-12b
+    kind: ollama
+    family: gemma
+    model: gemma3:12b
+    gpu: true
+    exclusive_group: local-gpu
+    num_ctx: 32768
+
+  - id: claude
+    kind: claude-cli
+    family: anthropic
+    model: sonnet
+    price: {input_per_1m: 0, output_per_1m: 0}   # подписка CLI
+  - id: codex
+    kind: codex-cli
+    family: openai
+    model: default
+    price: {input_per_1m: 0, output_per_1m: 0}
+  - id: opencode
+    kind: opencode-cli
+    family: other
+    model: default
+    enabled: false
+
+  - id: openai-compat-local
+    kind: openai
+    family: qwen
+    model: Qwen3.6-35B-A3B-NVFP4
+    url: http://127.0.0.1:1919/v1
+    gpu: true
+    exclusive_group: local-gpu
+    enabled: false
+    params: {temperature: 0.7, top_p: 0.8, top_k: 20, presence_penalty: 1.0}
+  - id: openrouter-x
+    kind: openrouter
+    family: minimax
+    model: minimax/minimax-m3
+    api_key_env: OPENROUTER_API_KEY
+    max_parallel: 2
+    enabled: false
+    price: {input_per_1m: 0.3, output_per_1m: 1.2}
+  - id: gigachat
+    kind: gigachat
+    family: gigachat
+    model: GigaChat-2
+    api_key_env: GIGACHAT_CREDENTIALS
+    ca_bundle: ""          # путь к корневому сертификату, если системного нет
+    enabled: false
+
+roles:                       # назначение по умолчанию; проект может переопределить
+  ideator: codex
+  critic: ollama-gemma4-12b
+  literature_scout: ollama-gemma4-12b
+  experiment_planner: codex
+  section_writer: codex
+  editor: ollama-gemma4-12b
+  judge: [ollama-yandexgpt5-8b, ollama-gemma3-12b, ollama-qwen3-14b, claude, codex]
+
+profiles:                    # быстрые переключатели в интерфейсе
+  local-only: {ideator: ollama-gemma4-12b, section_writer: ollama-gemma4-12b, experiment_planner: ollama-qwen3-14b}
+  quality:    {ideator: codex, section_writer: codex, experiment_planner: codex}

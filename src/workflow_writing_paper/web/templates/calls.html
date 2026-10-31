@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Журнал вызовов{% endblock %}
+{% block content %}
+<h1>Журнал вызовов</h1>
+<p class="muted">Всего: {{ totals.n }} вызовов, токены {{ totals.tin or 0 }} / {{ totals.tout or 0 }}, ${{ '%.4f'|format(totals.usd or 0) }}.</p>
+<form method="get">
+  роль <input name="role" value="{{ role }}" size="12">
+  провайдер <input name="provider" value="{{ provider }}" size="20">
+  <button>Фильтр</button>
+</form>
+<table>
+  <tr><th>#</th><th>время</th><th>роль</th><th>провайдер</th><th>семейство</th><th>задача</th><th>токены</th><th>с</th><th>$</th><th></th></tr>
+  {% for r in rows %}
+  <tr>
+    <td><a href="/calls/{{ r.id }}">{{ r.id }}</a></td><td>{{ r.created_at }}</td><td>{{ r.role }}</td>
+    <td>{{ r.provider }}</td><td>{{ r.family }}</td><td>{{ r.task or '' }}</td>
+    <td class="num">{{ r.tokens_in }} / {{ r.tokens_out }}</td>
+    <td class="num">{{ '%.1f'|format((r.duration_ms or 0) / 1000) }}</td>
+    <td class="num">{{ '%.4f'|format(r.cost_usd or 0) }}</td>
+    <td>{% if r.error %}<span class="bad" title="{{ r.error }}">ошибка</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

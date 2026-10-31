@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Пул моделей{% endblock %}
+{% block content %}
+<h1>Пул моделей</h1>
+<p class="muted">Источник — workspace/providers.yaml. Провайдеры правятся в файле; назначения на роли — здесь.</p>
+<table>
+  <tr><th>id</th><th>kind</th><th>семейство</th><th>модель</th><th>GPU / группа</th><th>цена за 1M (вх/вых)</th><th>доступность</th></tr>
+  {% for p in providers %}
+  <tr class="{{ 'muted' if p.enabled is sameas false }}">
+    <td>{{ p.id }}{% if p.enabled is sameas false %} (выкл){% endif %}</td>
+    <td>{{ p.kind }}</td><td>{{ p.family }}</td><td>{{ p.model }}</td>
+    <td>{{ 'да' if p.gpu else '' }} {{ p.exclusive_group or '' }}</td>
+    <td>{% if p.price %}{{ p.price.input_per_1m }} / {{ p.price.output_per_1m }}{% endif %}</td>
+    <td><button hx-get="/pool/ping/{{ p.id }}" hx-swap="outerHTML">проверить</button></td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h2>Назначение на роли</h2>
+<form method="post" action="/pool/roles">
+  <table>
+    <tr><th style="width:12rem">роль</th><th>провайдеры (через запятую; у судьи — список в порядке приоритета)</th></tr>
+    {% for role, ids in roles.items() %}
+    <tr><td>{{ role }}</td><td><input type="text" name="role:{{ role }}" value="{{ ids }}"></td></tr>
+    {% endfor %}
+  </table>
+  <button type="submit">Сохранить</button>
+</form>
+
+{% if profiles %}
+<h2>Профили</h2>
+{% for name, roles_ in profiles.items() %}
+<form method="post" action="/pool/profile/{{ name }}" style="display:inline">
+  <button type="submit" title="{{ roles_ }}">{{ name }}</button>
+</form>
+{% endfor %}
+{% endif %}
+{% endblock %}

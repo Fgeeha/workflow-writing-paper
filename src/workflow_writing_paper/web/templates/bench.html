@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Стенд · {{ role }}{% endblock %}
+{% block content %}
+<h1>Стенд сравнения моделей</h1>
+<p>Роль:
+  {% for r in roles %}<a href="/bench?role={{ r }}">{% if r == role %}<b>{{ r }}</b>{% else %}{{ r }}{% endif %}</a> {% endfor %}
+</p>
+
+<h2>Итог: {{ role }} × модель</h2>
+{% if recommendation %}<p class="rec">Рекомендация: <b>{{ recommendation }}</b>. Назначение на роль — на странице «Пул моделей».</p>{% endif %}
+<table>
+  <tr><th>модель</th><th>семейство</th><th>задач</th><th>ошибок</th><th>судьи (медиана 0–10)</th><th>автор (медиана 1–5)</th>
+      <th>покрытие must_mention</th><th>время, с (медиана)</th><th>$ на задачу</th></tr>
+  {% for t in table %}
+  <tr>
+    <td>{{ t.provider }}</td><td>{{ t.family }}</td><td class="num">{{ t.n }}</td><td class="num">{{ t.errors }}</td>
+    <td class="num">{{ '%.1f'|format(t.judge) if t.judge is not none else '—' }}</td>
+    <td class="num">{{ '%.1f'|format(t.human) if t.human is not none else '—' }}</td>
+    <td class="num">{{ '%.0f%%'|format(t.coverage * 100) if t.coverage is not none else '—' }}</td>
+    <td class="num">{{ '%.1f'|format(t.duration_ms / 1000) if t.duration_ms is not none else '—' }}</td>
+    <td class="num">{{ '%.4f'|format(t.cost_usd) if t.cost_usd is not none else '—' }}</td>
+  </tr>
+  {% else %}
+  <tr><td colspan="9" class="muted">Прогонов ещё не было.</td></tr>
+  {% endfor %}
+</table>
+
+<h2>Запуск</h2>
+<form method="post" action="/bench/run">
+  <input type="hidden" name="role" value="{{ role }}">
+  {% for p in providers %}<label><input type="checkbox" name="providers" value="{{ p }}"> {{ p }}</label> {% endfor %}
+  <p class="muted">Судьи (по приоритету, берутся два других семейств): {{ judges|join(', ') or 'не назначены' }}</p>
+  <button type="submit">Запустить</button>
+</form>
+<div hx-get="/bench/jobs" hx-trigger="load, every 3s"></div>
+
+<h2>Ответы</h2>
+<table>
+  <tr><th>прогон</th><th>задача</th><th>модель</th><th>судьи</th><th>покрытие</th><th>с</th><th>оценка автора</th><th></th></tr>
+  {% for r in runs %}
+  <tr>
+    <td>{{ r.run }}</td><td>{{ r.task }}</td><td>{{ r.provider }}</td>
+    <td class="num">{{ '%.1f'|format(r.judge_overall) if r.judge_overall is not none else '—' }}</td>
+    <td class="num">{{ '%.0f%%'|format(r.coverage * 100) if r.coverage is not none else '—' }}</td>
+    <td class="num">{{ '%.1f'|format(r.duration_ms / 1000) if r.duration_ms else '—' }}</td>
+    <td>
+      {% if r.answer_path %}
+      <form hx-post="/bench/score/{{ r.id }}" hx-swap="outerHTML">
+        {% for s in range(1, 6) %}<button name="score" value="{{ s }}" {% if r.human_score == s %}style="font-weight:bold"{% endif %}>{{ s }}</button>{% endfor %}
+      </form>
+      {% endif %}
+    </td>
+    <td><a href="/bench/answer/{{ r.id }}">открыть</a>{% if r.error %} <span class="bad" title="{{ r.error }}">⚠</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

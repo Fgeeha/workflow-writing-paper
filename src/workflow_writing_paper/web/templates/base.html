@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}wwp{% endblock %}</title>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <style>
+    body { font: 15px/1.45 system-ui, sans-serif; margin: 0; color: #1d2329; background: #fafaf8; }
+    nav { background: #1d2329; padding: .6rem 1.5rem; display: flex; gap: 1.5rem; }
+    nav a { color: #e8e6df; text-decoration: none; } nav a:hover { text-decoration: underline; }
+    main { padding: 1.2rem 1.5rem; max-width: 1200px; }
+    table { border-collapse: collapse; width: 100%; margin: .5rem 0 1.5rem; }
+    th, td { border-bottom: 1px solid #ddd; padding: .35rem .5rem; text-align: left; vertical-align: top; }
+    th { background: #efeee9; font-weight: 600; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    pre { background: #fff; border: 1px solid #ddd; padding: .8rem; white-space: pre-wrap; }
+    input[type=text] { width: 100%; box-sizing: border-box; }
+    .ok { color: #2a7a3b; } .bad { color: #b3261e; } .muted { color: #777; }
+    .rec { background: #e6f2e8; padding: .5rem .8rem; border-left: 4px solid #2a7a3b; }
+    button { cursor: pointer; }
+  </style>
+</head>
+<body>
+<nav>
+  <b style="color:#fff">wwp</b>
+  <a href="/pool">Пул моделей</a>
+  <a href="/bench">Стенд</a>
+  <a href="/calls">Журнал вызовов</a>
+</nav>
+<main>{% block content %}{% endblock %}</main>
+</body>
+</html>
