@@ -9,11 +9,13 @@ from typing import Any
 
 from .base import Completion, Message, Provider, ProviderError, extract_json
 from .cli import PRESETS, CliProvider
+from .decision import DecisionProvider
 from .fake import FakeProvider
 from .http import GigaChatProvider, OllamaProvider, OpenAIProvider, OpenRouterProvider
 
 KINDS: dict[str, type[Provider]] = {
     "ollama": OllamaProvider,
+    "ollama-decision": DecisionProvider,
     "openai": OpenAIProvider,
     "openrouter": OpenRouterProvider,
     "gigachat": GigaChatProvider,

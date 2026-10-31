@@ -8,8 +8,9 @@ from workflow_writing_paper.web import create_app
 FAKE_POOL = {
     "providers": [
         {"id": "cand-a", "kind": "fake", "family": "a", "reply": "Нет сравнения с базовой линией, малая выборка."},
-        {"id": "cand-b", "kind": "fake", "family": "b"},
-        {"id": "cand-c", "kind": "fake", "family": "c"},
+        {"id": "cand-b", "kind": "fake", "family": "b", "reply": "Замечаний к тексту нет."},
+        {"id": "cand-c", "kind": "fake", "family": "c", "reply": "Текст написан хорошо."},
+        {"id": "cand-en", "kind": "fake", "family": "e", "reply": "No baseline, small sample."},
         {"id": "judge-a", "kind": "fake", "family": "a", "score": 9},
         {"id": "judge-x", "kind": "fake", "family": "x", "score": 6},
         {"id": "judge-y", "kind": "fake", "family": "y", "score": 8},
@@ -92,3 +93,47 @@ def test_rubric_weights_and_overall():
     assert weighted_overall({"C1": 10, "C2": 5, "C3": 0, "C4": 10}, w) == 6.5
     assert weighted_overall({"C1": 10, "C2": 5, "C3": 0}, w) is None  # нет критерия
     assert weighted_overall({"C1": 70, "C2": 5, "C3": 0, "C4": 1}, w) is None  # вне шкалы
+
+
+def test_language_check_marks_foreign_answer(tmp_path):
+    from workflow_writing_paper.eval.bench import language_share
+
+    assert language_share("Нет сравнения с базовой линией (baseline) и мала выборка.", "ru") > 0.8
+    assert language_share("No baseline at all", "ru") == 0.0
+    assert language_share("12 + 3 = 15", "ru") == 1.0
+    ws = make_ws(tmp_path)
+    run_bench(ws, "critic", ["cand-en"])
+    rows = ws.db().execute("SELECT error FROM bench_runs").fetchall()
+    assert all("не на языке задачи" in r["error"] for r in rows)
+
+
+def test_decision_judge_scores_via_systemone(tmp_path, monkeypatch):
+    from workflow_writing_paper.providers import decision
+
+    def fake_request(url, body=None, headers=None, timeout=0, context=None):
+        assert url.endswith("/v1/systemone") and set(body["questions"]) == {"C1", "C2", "C3", "C4"}
+        assert body["questions"]["C1"]["type"] == "score"
+        return {"answers": {c: {"type": "score", "score": 3.0, "probabilities": {"3": 1.0}} for c in body["questions"]},
+                "usage": {"input_tokens": 100}}
+
+    monkeypatch.setattr(decision, "_request", fake_request)
+    ws = make_ws(tmp_path)
+    cfg = ws.config()
+    cfg["providers"].append({"id": "dec", "kind": "ollama-decision", "family": "d", "model": "kev"})
+    cfg["roles"]["judge"] = ["dec", "judge-x"]
+    ws.save_config(cfg)
+    run_bench(ws, "critic", ["cand-a"])
+    import json
+    row = ws.db().execute("SELECT judge_scores, judge_overall, error FROM bench_runs").fetchone()
+    js = json.loads(row["judge_scores"])
+    assert js["dec"]["scores"] == {"C1": 7.5, "C2": 7.5, "C3": 7.5, "C4": 7.5} and js["dec"]["overall"] == 7.5
+    assert row["error"] is None and row["judge_overall"] == 6.75  # медиана (7.5, 6)
+    assert ws.db().execute("SELECT count(*) FROM calls WHERE provider='dec'").fetchone()[0] == 3
+
+
+def test_rubric_criteria_texts():
+    from workflow_writing_paper.core.workspace import DEFAULTS
+    from workflow_writing_paper.eval.bench import rubric_criteria
+
+    c = rubric_criteria((DEFAULTS / "rubrics" / "critic.md").read_text(encoding="utf-8"))
+    assert set(c) == {"C1", "C2", "C3", "C4"} and c["C1"].startswith("Находит существенные")

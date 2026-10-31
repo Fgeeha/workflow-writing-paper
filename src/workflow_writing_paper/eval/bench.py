@@ -15,16 +15,34 @@ import yaml
 
 from ..core import Workspace
 from ..providers import Provider, ProviderError, build_pool, call_logged, pick_judges, role_providers
+from ..providers.decision import DecisionProvider
 
 logger = logging.getLogger(__name__)
 
+LANGUAGE_MIN_SHARE = 0.8  # меньшая доля букв языка задачи — ответ не на том языке
+
 _WORD = re.compile(r"\w+", re.UNICODE)
-_RUBRIC_ROW = re.compile(r"^\|\s*(C\d+)\s*\|.*\|\s*([\d.]+)\s*\|\s*$", re.MULTILINE)
+_RUBRIC_ROW = re.compile(r"^\|\s*(C\d+)\s*\|(.*)\|\s*([\d.]+)\s*\|\s*$", re.MULTILINE)
+_CYR = re.compile(r"[а-яё]", re.IGNORECASE)
+_LAT = re.compile(r"[a-z]", re.IGNORECASE)
+
+
+def language_share(text: str, language: str) -> float:
+    """Доля букв языка задачи среди кириллицы и латиницы; 1.0 — ответ целиком на языке задачи."""
+    cyr, lat = len(_CYR.findall(text)), len(_LAT.findall(text))
+    if cyr + lat == 0:
+        return 1.0
+    return (cyr if language == "ru" else lat) / (cyr + lat)
+
+
+def rubric_criteria(rubric: str) -> dict[str, str]:
+    """Коды и формулировки критериев из таблицы рубрики."""
+    return {code: text.strip() for code, text, _ in _RUBRIC_ROW.findall(rubric)}
 
 
 def rubric_weights(rubric: str) -> dict[str, float]:
     """Коды и веса критериев из таблицы рубрики: строки вида `| C1 | критерий | 0.4 |`."""
-    weights = {code: float(w) for code, w in _RUBRIC_ROW.findall(rubric)}
+    weights = {code: float(w) for code, _, w in _RUBRIC_ROW.findall(rubric)}
     if not weights:
         raise ValueError("в рубрике нет строк критериев вида | C1 | … | вес |")
     return weights
@@ -141,6 +159,9 @@ def _run_one(ws: Workspace, db: Any, run: str, run_dir: Path, role: str, task: d
     weights = rubric_weights(rubric)
     scores: dict[str, Any] = {}
     for judge in pick_judges(pool, judge_ids, author.family, n_judges):
+        if isinstance(judge, DecisionProvider):
+            scores[judge.id] = _decision_judge(judge, task, rubric, comp.text, weights, log_dir, db)
+            continue
         try:
             jc = call_logged(judge, _judge_messages(ws, task, rubric, comp.text), role="judge", log_dir=log_dir,
                              db=db, task=task["id"], json_schema=judge_schema(weights), max_tokens=1500,
@@ -154,10 +175,49 @@ def _run_one(ws: Workspace, db: Any, run: str, run_dir: Path, role: str, task: d
             scores[judge.id]["error"] = "оценки критериев отсутствуют или вне шкалы 0–10"
     overalls = [float(s["overall"]) for s in scores.values() if isinstance(s.get("overall"), (int, float))]
     error = None if len(overalls) >= n_judges else f"оценок судей других семейств: {len(overalls)} из {n_judges}"
+    share = language_share(comp.text, lang)
+    if share < LANGUAGE_MIN_SHARE:
+        error = f"ответ не на языке задачи ({lang}: {share:.0%})" + (f"; {error}" if error else "")
     _insert(db, {**row, "answer_path": str(answer_path), "judge_scores": json.dumps(scores, ensure_ascii=False),
                  "judge_overall": statistics.median(overalls) if overalls else None,
                  "coverage": coverage(comp.text, task.get("expected")), "duration_ms": comp.duration_ms,
                  "cost_usd": comp.cost_usd, "error": error})
+
+
+def _decision_judge(judge: DecisionProvider, task: dict[str, Any], rubric: str, answer: str,
+                    weights: dict[str, float], log_dir: Path, db: Any) -> dict[str, Any]:
+    """Оценка decision-моделью: по вопросу `score` на критерий; запись в журнал вызовов как у текстовых судей."""
+    expected = yaml.safe_dump(task.get("expected") or {}, allow_unicode=True)
+    state = (f"## Задача, поставленная модели\n{task['input']}\n\n## Чего ждёт автор от хорошего ответа\n"
+             f"{expected}\n\n## Ответ модели\n{answer}")
+    criteria = rubric_criteria(rubric)
+    started = time.monotonic()
+    record: dict[str, Any] = {"provider": judge.id, "family": judge.family, "model": judge.model, "role": "judge",
+                              "task": task["id"], "state": state, "criteria": criteria}
+    try:
+        result, tokens = judge.score(state, criteria)
+    except ProviderError as e:
+        record["error"] = str(e)
+        _log_call(log_dir, db, judge, task["id"], record, 0, started, str(e))
+        return {"family": judge.family, "error": str(e)}
+    scores = {code: v["score"] for code, v in result.items()}
+    record.update(data=result, tokens_in=tokens)
+    _log_call(log_dir, db, judge, task["id"], record, tokens, started, None)
+    return {"family": judge.family, "scores": scores, "probabilities": {c: v["probabilities"] for c, v in result.items()},
+            "comments": [], "overall": weighted_overall(scores, weights)}
+
+
+def _log_call(log_dir: Path, db: Any, judge: Provider, task_id: str, record: dict[str, Any], tokens: int,
+              started: float, error: str | None) -> None:
+    log_dir.mkdir(parents=True, exist_ok=True)
+    duration = int((time.monotonic() - started) * 1000)
+    path = log_dir / f"{time.strftime('%Y-%m-%dT%H-%M-%S')}-{time.monotonic_ns() % 1_000_000:06d}-judge-{judge.id}.json"
+    path.write_text(json.dumps({**record, "duration_ms": duration}, ensure_ascii=False, indent=1, default=str),
+                    encoding="utf-8")
+    db.execute("INSERT INTO calls(task, role, provider, family, prompt_path, tokens_in, tokens_out, duration_ms,"
+               " cost_usd, error) VALUES (?,?,?,?,?,?,?,?,?,?)",
+               (task_id, "judge", judge.id, judge.family, str(path), tokens, 0, duration, 0.0, error))
+    db.commit()
 
 
 def _insert(db: Any, row: dict[str, Any]) -> None:

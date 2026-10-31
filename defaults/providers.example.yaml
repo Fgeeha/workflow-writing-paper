@@ -20,6 +20,14 @@ providers:
     exclusive_group: local-gpu
     num_ctx: 32768
     think: false
+  - id: ollama-qwen35-9b
+    kind: ollama
+    family: qwen
+    model: qwen3.5:9b
+    gpu: true
+    exclusive_group: local-gpu
+    num_ctx: 32768
+    think: false
   - id: ollama-lfm25-8b
     kind: ollama
     family: liquid
@@ -43,6 +51,13 @@ providers:
     gpu: true
     exclusive_group: local-gpu
     num_ctx: 32768
+
+  - id: kev-9b
+    kind: ollama-decision
+    family: qwen             # база Qwen3.5/3.8 — не судит модели семейства qwen
+    model: kev:9b-q4_K_M
+    gpu: true
+    exclusive_group: local-gpu
 
   - id: claude
     kind: claude-cli
@@ -92,7 +107,7 @@ roles:                       # назначение по умолчанию; п�
   experiment_planner: codex
   section_writer: codex
   editor: ollama-gemma4-12b
-  judge: [ollama-yandexgpt5-8b, ollama-gemma3-12b, ollama-qwen3-14b, claude, codex]
+  judge: [claude, codex, ollama-gemma3-12b, ollama-qwen3-14b, ollama-yandexgpt5-8b]
 
 profiles:                    # быстрые переключатели в интерфейсе
   local-only: {ideator: ollama-gemma4-12b, section_writer: ollama-gemma4-12b, experiment_planner: ollama-qwen3-14b}
