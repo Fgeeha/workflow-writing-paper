@@ -119,7 +119,7 @@ def merge_section(body: str, section: str, text: str, order: list[str]) -> str:
 
 def _draft_context(project: Project) -> str:
     parts = [f"## Профиль журнала\n{yaml.safe_dump(project.journal(), allow_unicode=True)}",
-             "## Реестр результатов — единственный источник чисел\n"
+             "## Реестр результатов — единственный источник чисел (только поля value; note — пояснения)\n"
              + json.dumps(project.registry_data(), ensure_ascii=False, indent=1)]
     for t in ("novelty", "literature", "experiment_plan"):
         art = project.artifact(t)

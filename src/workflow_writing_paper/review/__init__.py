@@ -34,7 +34,8 @@ def _context(project: Project, art: Artifact) -> str:
         parts.append("## Материалы автора (исходный ввод; всё, что есть в нём, считается подтверждённым)\n"
                      + str(art.meta["source"]))
     if art.type in ("draft", "paper"):
-        parts.append("## Реестр результатов (единственный источник чисел)\n"
+        parts.append("## Реестр результатов (единственный источник чисел; цитируемы только поля value, "
+                     "поля note — пояснения, числа из них в текст не переносятся)\n"
                      + json.dumps(project.registry_data(), ensure_ascii=False, indent=1))
     return "\n\n".join(parts)
 
