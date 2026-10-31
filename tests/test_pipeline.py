@@ -67,6 +67,7 @@ def test_end_to_end_novelty_then_draft(tmp_path):
     art = project.artifact("novelty")
     assert art.version == 1 and art.status == "in_review"
     assert art.meta["created_by"]["family"] == "a"
+    assert art.meta["source"].startswith("Мы ускорили")
     judges = {json.loads((project.path / p).read_text())["judge"]["provider"] for p in art.meta["reviews"]}
     assert judges == {"judge-x", "judge-y", "checker"}  # judge-a (семейство автора) исключён
     assert art.meta["review_summary"]["accepted"] and art.meta["review_summary"]["min_overall"] == 8.0
@@ -171,3 +172,16 @@ def test_web_pages_end_to_end(tmp_path):
     r = client.post("/settings/edit", data={"rel": "rubrics/novelty.md", "text": "# x\n| C1 | a | 1 |\n"},
                     follow_redirects=False)
     assert r.status_code == 303 and (ws.root / "rubrics" / "novelty.md").read_text().startswith("# x")
+
+
+def test_required_sections_match_by_stem(tmp_path):
+    from workflow_writing_paper.core.artifact import Artifact
+    from workflow_writing_paper.review.checks import deterministic_checks
+
+    ws, project = make(tmp_path)
+    rubric = ws.text("rubrics/novelty.md")
+    body = NOVELTY_OK.replace("## Журналы", "### 6. Типы журналов и конференций").replace("## Гипотезы",
+                                                                                          "### Гипотезы и критерии")
+    assert deterministic_checks(project, Artifact(type="novelty", body=body), rubric) == []
+    issues = [b["issue"] for b in deterministic_checks(project, Artifact(type="novelty", body="## Гипотезы\nx"), rubric)]
+    assert len(issues) == 5 and all("нет обязательного раздела" in i for i in issues)

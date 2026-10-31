@@ -88,7 +88,7 @@ def stage_novelty(project: Project, payload: dict[str, Any], task: str | None = 
     final, provider = call_role(project, "ideator", f"{base}\n\n## Твой черновик\n{draft.text}\n\n"
                                 f"## Критика\n{critique.text}\n\nПерепиши черновик, ответив на критику: "
                                 "исправь обоснованное, аргументированно отклони спорное.", task)
-    project.write_artifact("novelty", final.text, _created_by("ideator", provider))
+    project.write_artifact("novelty", final.text, _created_by("ideator", provider), source=source)
 
     def revise(blockers: list[dict[str, Any]]) -> None:
         cur = project.artifact("novelty")

@@ -90,16 +90,22 @@ class Project:
         p = self.path / "artifacts" / "history" / f"{type_}.v{version}.md"
         return Artifact.parse(p.read_text(encoding="utf-8"), type_) if p.exists() else None
 
-    def write_artifact(self, type_: str, body: str, created_by: dict[str, Any], status: str = "draft") -> Artifact:
-        """Новая версия: прежняя уходит в history/, одобренные зависимые артефакты помечаются stale."""
+    def write_artifact(self, type_: str, body: str, created_by: dict[str, Any], status: str = "draft",
+                       source: str | None = None) -> Artifact:
+        """Новая версия: прежняя уходит в history/, одобренные зависимые артефакты помечаются stale.
+
+        `source` — исходные материалы автора; наследуется от предыдущей версии, судьи видят его как контекст.
+        """
         prev = self.artifact(type_)
+        if source is None and prev is not None:
+            source = prev.meta.get("source")
         version = (prev.version if prev else 0) + 1
         if prev:
             (self.path / "artifacts" / "history" / f"{type_}.v{prev.version}.md").write_text(prev.dump(),
                                                                                                 encoding="utf-8")
         art = Artifact(type=type_, version=version, status=status, body=body,
                        meta={"created_by": created_by, "reviews": [], "approved_by": None, "approved_at": None,
-                             "override_reason": None, "chapter": self.manifest.get("chapter")})
+                             "override_reason": None, "chapter": self.manifest.get("chapter"), "source": source})
         self.artifact_path(type_).write_text(art.dump(), encoding="utf-8")
         self._mark_stale_after(type_)
         return art

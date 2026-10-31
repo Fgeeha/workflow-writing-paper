@@ -30,6 +30,9 @@ def verdict(overall: float | None, blockers: int, threshold: float) -> str:
 
 def _context(project: Project, art: Artifact) -> str:
     parts = [f"## Профиль журнала\n{yaml.safe_dump(project.journal(), allow_unicode=True)}"]
+    if art.meta.get("source"):
+        parts.append("## Материалы автора (исходный ввод; всё, что есть в нём, считается подтверждённым)\n"
+                     + str(art.meta["source"]))
     if art.type in ("draft", "paper"):
         parts.append("## Реестр результатов (единственный источник чисел)\n"
                      + json.dumps(project.registry_data(), ensure_ascii=False, indent=1))
