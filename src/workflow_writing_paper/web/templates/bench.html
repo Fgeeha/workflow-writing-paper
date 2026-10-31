@@ -7,6 +7,10 @@
 </p>
 
 <h2>Итог: {{ role }} × модель</h2>
+<p class="muted">Прогон:
+  {% for r in run_ids %}<a href="/bench?role={{ role }}&run={{ r }}">{% if r == run %}<b>{{ r }}</b>{% else %}{{ r }}{% endif %}</a> {% endfor %}
+  <a href="/bench?role={{ role }}&run=all">{% if run == 'all' %}<b>все</b>{% else %}все{% endif %}</a>
+</p>
 {% if recommendation %}<p class="rec">Рекомендация: <b>{{ recommendation }}</b>. Назначение на роль — на странице «Пул моделей».</p>{% endif %}
 <table>
   <tr><th>модель</th><th>семейство</th><th>задач</th><th>ошибок</th><th>судьи (медиана 0–10)</th><th>автор (медиана 1–5)</th>

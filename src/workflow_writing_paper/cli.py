@@ -40,9 +40,9 @@ def cmd_bench(ws: Workspace, args: argparse.Namespace) -> int:
     run = run_bench(ws, args.role, pids, n_judges=args.judges,
                     progress=lambda d, t, note: print(f"[{d}/{t}] {note}", file=sys.stderr))
     db = ws.db()
-    table, rec = summary(db, args.role)
+    table, rec = summary(db, args.role, run)
     db.close()
-    print(f"прогон {run}; итог по роли {args.role} за все прогоны:")
+    print(f"прогон {run}; итог по роли {args.role}:")
     print(f"{'модель':28} {'задач':>5} {'ошиб':>4} {'судьи':>6} {'автор':>6} {'покрыт':>7} {'с':>7} {'$':>8}")
     for t in table:
         print(f"{t['provider']:28} {t['n']:>5} {t['errors']:>4} {_fmt(t['judge'], '%.1f'):>6} "

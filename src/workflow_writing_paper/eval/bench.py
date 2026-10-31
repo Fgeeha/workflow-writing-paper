@@ -231,10 +231,16 @@ def _median(values: list[Any]) -> float | None:
     return statistics.median(vals) if vals else None
 
 
-def summary(db: Any, role: str) -> tuple[list[dict[str, Any]], str | None]:
-    """Таблица роль × модель и рекомендация: лучшая по оценке автора, иначе по судьям; при равенстве — дешевле."""
+def summary(db: Any, role: str, run: str | None = None) -> tuple[list[dict[str, Any]], str | None]:
+    """Таблица роль × модель и рекомендация: лучшая по оценке автора, иначе по судьям; при равенстве — дешевле.
+
+    `run` — идентификатор прогона; None — по всем прогонам роли.
+    """
+    sql, args = "SELECT * FROM bench_runs WHERE role = ?", [role]
+    if run:
+        sql, args = sql + " AND run = ?", [*args, run]
     by: dict[str, list[Any]] = {}
-    for r in db.execute("SELECT * FROM bench_runs WHERE role = ?", (role,)).fetchall():
+    for r in db.execute(sql, args).fetchall():
         by.setdefault(r["provider"], []).append(r)
     table = []
     for pid, rs in sorted(by.items()):

@@ -81,19 +81,23 @@ def create_app(ws: Workspace | None = None) -> FastAPI:
 
     # --- стенд ------------------------------------------------------------------------
     @app.get("/bench")
-    def bench_page(request: Request, role: str = "critic") -> HTMLResponse:
+    def bench_page(request: Request, role: str = "critic", run: str = "") -> HTMLResponse:
         cfg = ws.config()
         task_dir = ws.root / "eval" / "tasks"
         roles = sorted(p.name for p in task_dir.iterdir() if p.is_dir()) if task_dir.exists() else []
         db = ws.db()
         try:
-            table, recommendation = summary(db, role)
+            run_ids = [r[0] for r in db.execute("SELECT DISTINCT run FROM bench_runs WHERE role = ? ORDER BY run DESC",
+                                                (role,)).fetchall()]
+            if not run and run_ids:
+                run = run_ids[0]
+            table, recommendation = summary(db, role, run if run != "all" else None)
             runs = db.execute("SELECT * FROM bench_runs WHERE role = ? ORDER BY id DESC LIMIT 200", (role,)).fetchall()
         finally:
             db.close()
         enabled = [p["id"] for p in cfg.get("providers") or [] if p.get("enabled", True) is not False]
-        return render(request, "bench.html", role=role, roles=roles, table=table, recommendation=recommendation,
-                      runs=runs, providers=enabled, judges=role_providers(cfg, "judge"))
+        return render(request, "bench.html", role=role, roles=roles, run=run, run_ids=run_ids, table=table,
+                      recommendation=recommendation, runs=runs, providers=enabled, judges=role_providers(cfg, "judge"))
 
     @app.post("/bench/run")
     async def bench_run(request: Request) -> RedirectResponse:
