@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any
 
 _CODE_BLOCK = re.compile(r"```.*?```|`[^`\n]*`|\$\$.*?\$\$|\$[^$\n]*\$", re.DOTALL)
-_CITATION = re.compile(r"\[[^\]\n]*\]|\([^()\n]*\d{4}[^()\n]*\)")  # [key, 2021], (Иванов, 2021)
+# [key] / [Иванов, 2021] и (Иванов, 2021) / (Smith et al., 2021a) — но не «(задержка 95,5 мс на 1000 снимках)»
+_CITATION = re.compile(r"\[[^\]\n]*\]|\((?:[^()\n\d]*?[,\s])?(?:19|20)\d{2}[a-zа-я]?\)")
 _LIST_MARKER = re.compile(r"^\s*\d+[.)]\s")
 _NUMBER = re.compile(r"(?<![\w.,])(\d+(?:[.,]\d+)?)(?![\w])")
 _PENDING = re.compile(r"\{pending\}")
@@ -49,7 +50,8 @@ def check_numbers(text: str, registry: dict[str, Any], rounding: int = 2) -> lis
     """
     values = [v.get("value") if isinstance(v, dict) else v for v in registry.values()]
     blockers = []
-    clean = _CODE_BLOCK.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)  # код/формулы → пробелы
+    originals = text.splitlines()
+    clean = strip_code(text)
     for lineno, line in enumerate(clean.splitlines(), 1):
         if line.lstrip().startswith("#") or _PENDING.search(line):
             continue
@@ -60,11 +62,16 @@ def check_numbers(text: str, registry: dict[str, Any], rounding: int = 2) -> lis
                 continue
             if any(_matches(num, v, rounding) for v in values):
                 continue
-            original = text.splitlines()[lineno - 1].strip()
+            original = originals[lineno - 1].strip()
             blockers.append({"line": lineno, "quote": original[:120], "number": num,
                              "issue": f"число {num} отсутствует в реестре результатов",
                              "check": f"grep -n '{num}' artifacts/draft.md; см. results.json"})
     return blockers
 
 
-__all__ = ["add_manual", "check_numbers", "load", "save"]
+def strip_code(text: str) -> str:
+    """Код и формулы → пробелы (строки сохраняются)."""
+    return _CODE_BLOCK.sub(lambda m: re.sub(r"[^\n]", " ", m.group(0)), text)
+
+
+__all__ = ["add_manual", "check_numbers", "load", "save", "strip_code"]

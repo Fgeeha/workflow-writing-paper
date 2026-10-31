@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import time
 from pathlib import Path
@@ -81,7 +82,7 @@ def call_logged(provider: Provider, messages: list[Message], *, role: str, log_d
         db.commit()
     if comp is None:
         raise ProviderError(error or "ошибка", record.get("text", ""))
-    return comp
+    return dataclasses.replace(comp, log_path=str(path))
 
 
 __all__ = [

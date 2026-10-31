@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import statistics
 import time
 from collections.abc import Callable
@@ -22,17 +21,13 @@ from ..review.rubric import (
     language_share,
     rubric_criteria,
     rubric_weights,
+    stems,
     weighted_overall,
 )
 
 logger = logging.getLogger(__name__)
 
 
-_WORD = re.compile(r"\w+", re.UNICODE)
-
-
-def _stems(text: str) -> set[str]:
-    return {w[:5] for w in _WORD.findall(text.lower()) if len(w) > 3}
 
 
 def coverage(answer: str, expected: dict[str, Any] | None) -> float | None:
@@ -43,8 +38,8 @@ def coverage(answer: str, expected: dict[str, Any] | None) -> float | None:
     items = (expected or {}).get("must_mention") or []
     if not items:
         return None
-    have = _stems(answer)
-    return sum(1 for item in items if _stems(item) <= have) / len(items)
+    have = stems(answer)
+    return sum(1 for item in items if stems(item) <= have) / len(items)
 
 
 def load_tasks(ws: Workspace, role: str) -> list[dict[str, Any]]:

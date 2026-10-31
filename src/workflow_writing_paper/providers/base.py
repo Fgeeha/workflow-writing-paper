@@ -34,6 +34,7 @@ class Completion:
     tokens_out: int = 0
     duration_ms: int = 0
     cost_usd: float = 0.0
+    log_path: str | None = None  # путь записи вызова, если он журналировался
 
 
 def extract_json(text: str) -> Any:

@@ -260,7 +260,7 @@ template: experimental         # имя из templates/
 journal: generic               # имя из journals/
 chapter: 4                     # привязка к главе диссертации (необязательно)
 budget: {tokens: 5_000_000, usd: 20}
-review: {judges: 2, threshold: 7.0}
+review: {judges: 2, threshold: null, auto_iterations: 2}   # threshold null — порог из рубрики
 roles: {}                      # переопределения providers.yaml:roles
 stages:                        # копируется из шаблона, можно править
   - {id: novelty,         required: true}
@@ -309,6 +309,8 @@ approved_by: human
 approved_at: 2026-10-31T13:00:00
 override_reason: null
 chapter: 4
+source: <исходный ввод автора; судьи видят его как подтверждённые материалы>
+review_summary: {accepted: false, threshold: 7.0, min_overall: 6.98, blockers: 0, errors: []}
 ---
 ```
 
@@ -445,7 +447,7 @@ numbers: {decimal_separator: ",", rounding: 2}
 | Главная | ожидающие решения автора: гейты, артефакты на одобрении, остановки по бюджету и конфликтам реестра |
 | Проекты | список, создание из шаблона, привязка внешнего каталога |
 | Проект | лента стадий с состоянием, артефакты по стадиям, бюджет, кнопки запуска стадии / возврата |
-| Артефакт | текст, diff с предыдущей версией, отчёты судей с блокерами (переход к строке), действия одобрить / override / вернуть / отклонить / в эталоны |
+| Артефакт | текст, diff с предыдущей версией, отчёты судей с блокерами (переход к строке), действия одобрить / override / вернуть / отклонить / в эталоны / перепроверить судьями |
 | Реестр результатов | таблица ключей, источники, ручной ввод, конфликты |
 | Библиотека | импорт, список записей, поиск, предложенные OpenAlex-находки на подтверждение |
 | Пул моделей | провайдеры, доступность (пинг), назначение на роли, профили |
@@ -462,6 +464,7 @@ wwp new <slug> --template experimental [--path /external/dir]
 wwp run <slug> <stage>                поставить стадию в очередь
 wwp bench --role <role> [--providers a,b]
 wwp check <slug>                      только детерминированные проверки
+wwp review <slug> [artifact]          перепроверить артефакт судьями без перегенерации
 wwp export <slug> [--to docx|pdf]     через pandoc
 wwp reindex                           пересобрать wwp.sqlite из файлов
 wwp gc [--older-than 90d]             очистка журнала вызовов и истории

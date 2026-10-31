@@ -10,11 +10,12 @@ import yaml
 
 _FRONT = re.compile(r"\A---\n(.*?)\n---\n?(.*)\Z", re.DOTALL)
 
-STATUSES = ("draft", "in_review", "approved", "rejected", "stale")
 
 
 @dataclass
 class Artifact:
+    """Статусы: draft | in_review | approved | rejected | stale."""
+
     type: str
     version: int = 0
     status: str = "draft"
@@ -23,6 +24,7 @@ class Artifact:
 
     @classmethod
     def parse(cls, text: str, type_hint: str = "") -> Artifact:
+        """Разобрать markdown с YAML-заголовком; без заголовка — тело целиком, тип из подсказки."""
         m = _FRONT.match(text)
         if not m:
             return cls(type=type_hint, body=text)
@@ -31,5 +33,6 @@ class Artifact:
                    status=head.pop("status", "draft"), body=m.group(2), meta=head)
 
     def dump(self) -> str:
+        """Собрать markdown с YAML-заголовком."""
         head = {"type": self.type, "version": self.version, "status": self.status, **self.meta}
         return "---\n" + yaml.safe_dump(head, allow_unicode=True, sort_keys=False) + "---\n" + self.body

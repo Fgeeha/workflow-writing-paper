@@ -18,6 +18,7 @@ from ..core import Workspace
 from ..core.engine import Worker
 from ..eval import run_bench, summary
 from ..providers import build_pool, role_providers
+from .projects import register
 
 logger = logging.getLogger(__name__)
 
@@ -200,8 +201,6 @@ def create_app(ws: Workspace | None = None, worker: bool = True) -> FastAPI:
                                            "duration_ms", "cost_usd", "params")}
         blocks.insert(0, ("параметры", json.dumps(meta, ensure_ascii=False, indent=2, default=str)))
         return render(request, "call.html", title=f"Вызов {cid} · {row['role']} · {row['provider']}", blocks=blocks)
-
-    from .projects import register
 
     register(app, ws, render)
     return app

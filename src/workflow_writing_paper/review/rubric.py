@@ -11,6 +11,12 @@ _CYR = re.compile(r"[а-яё]", re.IGNORECASE)
 _LAT = re.compile(r"[a-z]", re.IGNORECASE)
 
 LANGUAGE_MIN_SHARE = 0.8  # меньшая доля букв языка задачи — текст не на том языке
+_WORD = re.compile(r"\w+", re.UNICODE)
+
+
+def stems(text: str) -> set[str]:
+    """Основы слов (первые 5 букв, слова длиннее 3): грубое сопоставление формулировок."""
+    return {w[:5] for w in _WORD.findall(text.lower()) if len(w) > 3}
 
 
 def rubric_criteria(rubric: str) -> dict[str, str]:
@@ -19,6 +25,7 @@ def rubric_criteria(rubric: str) -> dict[str, str]:
 
 
 def rubric_weights(rubric: str) -> dict[str, float]:
+    """Коды и веса критериев; ошибка, если таблицы критериев нет."""
     weights = {code: float(w) for code, _, w in _RUBRIC_ROW.findall(rubric)}
     if not weights:
         raise ValueError("в рубрике нет строк критериев вида | C1 | … | вес |")
@@ -26,6 +33,7 @@ def rubric_weights(rubric: str) -> dict[str, float]:
 
 
 def rubric_threshold(rubric: str, default: float) -> float:
+    """Порог принятия из строки «Порог принятия: N», иначе default."""
     m = _THRESHOLD.search(rubric)
     return float(m.group(1) or m.group(2)) if m else default
 

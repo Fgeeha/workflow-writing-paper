@@ -7,26 +7,21 @@ from typing import Any
 
 from ..core.artifact import Artifact
 from ..core.project import Project
-from ..registry import check_numbers
-from .rubric import LANGUAGE_MIN_SHARE, language_share
+from ..registry import check_numbers, strip_code
+from .rubric import LANGUAGE_MIN_SHARE, language_share, stems
 
 _REQUIRED = re.compile(r"Обязательные разделы:\s*(.+)|Required sections:\s*(.+)")
 
 NUMBER_CHECKED_TYPES = ("draft", "paper")
-_WORD = re.compile(r"\w+", re.UNICODE)
-
-
-def _stems(text: str) -> set[str]:
-    """Основы слов (первые 5 букв) — чтобы «Журналы» совпало с «Типы журналов и конференций»."""
-    return {w[:5] for w in _WORD.findall(text.lower()) if len(w) > 3}
 
 
 def deterministic_checks(project: Project, art: Artifact, rubric: str) -> list[dict[str, Any]]:
+    """Язык текста (без кода и формул), обязательные разделы рубрики, запрещённые фразы, числа ↔ реестр."""
     blockers: list[dict[str, Any]] = []
     body = art.body
     lines = body.splitlines()
 
-    share = language_share(body, project.language)
+    share = language_share(strip_code(body), project.language)
     if share < LANGUAGE_MIN_SHARE:
         blockers.append({"line": 1, "quote": "", "issue": f"текст не на языке статьи ({project.language}: {share:.0%})",
                          "check": "language_share"})
@@ -35,7 +30,7 @@ def deterministic_checks(project: Project, art: Artifact, rubric: str) -> list[d
     if m:
         headings = [h.lower() for h in re.findall(r"^#+\s*(.+)$", body, re.MULTILINE)]
         for section in [s.strip() for s in (m.group(1) or m.group(2)).split(";") if s.strip()]:
-            if not any(_stems(section) <= _stems(h) for h in headings):
+            if not any(stems(section) <= stems(h) for h in headings):
                 blockers.append({"line": 1, "quote": "", "issue": f"нет обязательного раздела «{section}»",
                                  "check": f"grep -n '^#.*{section}'"})
 

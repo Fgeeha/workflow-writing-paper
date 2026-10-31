@@ -6,11 +6,9 @@ import json
 import time
 from typing import Any
 
-import yaml
-
 from ..core.artifact import Artifact
 from ..core.project import Project
-from ..providers import Provider, ProviderError, build_pool, call_logged, pick_judges, role_providers
+from ..providers import Provider, ProviderError, build_pool, call_logged, pick_judges
 from ..providers.decision import DecisionProvider
 from .checks import deterministic_checks
 from .rubric import judge_schema, rubric_criteria, rubric_threshold, rubric_weights, weighted_overall
@@ -20,24 +18,38 @@ class ReviewError(RuntimeError):
     pass
 
 
-def verdict(overall: float | None, blockers: int, threshold: float) -> str:
+def verdict(overall: float | None, n_blockers: int, threshold: float) -> str:
+    """accept | minor | major | reject | error — по итоговой оценке и числу блокеров."""
     if overall is None:
         return "error"
     if overall >= threshold:
-        return "accept" if blockers == 0 else "minor"
+        return "accept" if n_blockers == 0 else "minor"
     return "major" if overall >= threshold - 2 else "reject"
 
 
 def _context(project: Project, art: Artifact) -> str:
-    parts = [f"## Профиль журнала\n{yaml.safe_dump(project.journal(), allow_unicode=True)}"]
+    parts = [project.context_header(with_registry=art.type in ("draft", "paper"))]
     if art.meta.get("source"):
         parts.append("## Материалы автора (исходный ввод; всё, что есть в нём, считается подтверждённым)\n"
                      + str(art.meta["source"]))
-    if art.type in ("draft", "paper"):
-        parts.append("## Реестр результатов (единственный источник чисел; цитируемы только поля value, "
-                     "поля note — пояснения, числа из них в текст не переносятся)\n"
-                     + json.dumps(project.registry_data(), ensure_ascii=False, indent=1))
     return "\n\n".join(parts)
+
+
+def _locate(blockers: list[dict[str, Any]], body: str) -> list[dict[str, Any]]:
+    """Проставить номер строки по цитате судьи, если он её не указал."""
+    lines = body.splitlines()
+    for b in blockers:
+        quote = str(b.get("quote") or "").strip()
+        if b.get("line") or not quote:
+            continue
+        needle = quote[:40].lower()
+        b["line"] = next((i for i, ln in enumerate(lines, 1) if needle in ln.lower()), None)
+    return blockers
+
+
+def estimate_cost_usd(judges: list[Provider], prompt_chars: int, max_tokens: int) -> float:
+    """Грубая оценка стоимости проверки по таблице цен: ~4 символа на токен входа плюс полный выход."""
+    return sum(j.cost(prompt_chars // 4, max_tokens) for j in judges)
 
 
 def _text_judge(judge: Provider, project: Project, art: Artifact, rubric: str, weights: dict[str, float],
@@ -56,7 +68,7 @@ def _text_judge(judge: Provider, project: Project, art: Artifact, rubric: str, w
         db.close()
     data = comp.data or {}
     overall = weighted_overall(data.get("scores"), weights)
-    blockers = [b for b in (data.get("blockers") or []) if isinstance(b, dict)]
+    blockers = _locate([b for b in (data.get("blockers") or []) if isinstance(b, dict)], art.body)
     return {"scores": data.get("scores"), "overall": overall, "comments": data.get("comments") or [],
             "blockers": blockers, "verdict": verdict(overall, len(blockers), threshold),
             "error": None if overall is not None else "оценки критериев отсутствуют или вне шкалы"}
@@ -80,18 +92,22 @@ def review_artifact(project: Project, type_: str, task: str | None = None) -> di
     art = project.artifact(type_)
     if art is None:
         raise ReviewError(f"артефакта {type_} нет")
-    cfg = project.ws.config()
-    pool = build_pool(cfg)
-    settings = project.manifest.get("review") or {}
-    n = int(settings.get("judges", 2))
+    pool = build_pool(project.ws.config())
+    settings = project.review_settings()
+    n = int(settings["judges"])
     rubric = project.ws.text(f"rubrics/{type_}.md")
     weights = rubric_weights(rubric)
-    threshold = rubric_threshold(rubric, float(settings.get("threshold", 7.0)))
+    # порог: манифест проекта → строка «Порог принятия» рубрики → 7.0
+    threshold = float(settings["threshold"]) if settings["threshold"] is not None else rubric_threshold(rubric, 7.0)
     author_family = str((art.meta.get("created_by") or {}).get("family", ""))
-    candidates = role_providers(cfg, "judge")
+    candidates = project.judge_candidates()
     eligible = pick_judges(pool, candidates, author_family, len(candidates))  # все подходящие, по приоритету
     if len(eligible) < n:
         raise ReviewError(f"нужно {n} судей из семейств, отличных от {author_family!r}; доступно {len(eligible)}")
+    estimate = estimate_cost_usd(eligible[:n], len(rubric) + len(_context(project, art)) + len(art.body), 2500)
+    ok, why = project.budget_left(extra_usd=estimate)
+    if not ok:
+        raise ReviewError(f"проверка остановлена: оценка стоимости ${estimate:.3f}; {why}")
 
     reports: dict[str, dict[str, Any]] = {}
     succeeded = 0
@@ -132,4 +148,4 @@ def review_artifact(project: Project, type_: str, task: str | None = None) -> di
             "blockers": all_blockers, "errors": errors, "reports": reports}
 
 
-__all__ = ["ReviewError", "review_artifact", "verdict"]
+__all__ = ["ReviewError", "estimate_cost_usd", "review_artifact", "verdict"]

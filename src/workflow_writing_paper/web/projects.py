@@ -12,7 +12,7 @@ import yaml
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
-from ..core import Project, Workspace
+from ..core import Artifact, Project, Workspace
 from ..core.engine import enqueue
 from ..core.project import STAGE_ARTIFACT
 from ..core.workspace import DEFAULTS
@@ -22,7 +22,7 @@ from ..roles import NOT_YET
 Render = Callable[..., HTMLResponse]
 
 SETTINGS_DIRS = ("prompts", "rubrics", "journals", "templates", "eval/tasks", "style")
-ARTIFACT_TYPES = ("novelty", "literature", "experiment_plan", "draft", "paper")
+ARTIFACT_TYPES = tuple(dict.fromkeys(STAGE_ARTIFACT.values()))
 
 
 def _projects(ws: Workspace) -> list[dict[str, Any]]:
@@ -40,7 +40,7 @@ def _open(ws: Workspace, slug: str) -> Project:
         raise HTTPException(404, str(e)) from e
 
 
-def _reviews(project: Project, art: Any) -> list[dict[str, Any]]:
+def _reviews(project: Project, art: Artifact) -> list[dict[str, Any]]:
     reports = []
     for rel in art.meta.get("reviews") or []:
         p = project.path / rel
@@ -227,14 +227,11 @@ def register(app: FastAPI, ws: Workspace, render: Render) -> None:
     # --- настройки ----------------------------------------------------------------------------
     @app.get("/settings")
     def settings_page(request: Request) -> HTMLResponse:
-        seen: dict[str, bool] = {}
-        for d in SETTINGS_DIRS:
-            for base in (ws.root, DEFAULTS):
-                for p in sorted((base / d).rglob("*")) if (base / d).exists() else []:
-                    if p.is_file():
-                        rel = p.relative_to(base).as_posix()
-                        seen[rel] = seen.get(rel, False) or (ws.root / rel).exists()
-        files = [{"rel": rel, "overridden": ov} for rel, ov in sorted(seen.items())]
+        rels: set[str] = set()
+        for base in (ws.root, DEFAULTS):
+            for d in SETTINGS_DIRS:
+                rels |= {p.relative_to(base).as_posix() for p in (base / d).rglob("*") if p.is_file()}
+        files = [{"rel": rel, "overridden": (ws.root / rel).exists()} for rel in sorted(rels)]
         return render(request, "settings.html", files=files)
 
     @app.get("/settings/edit")

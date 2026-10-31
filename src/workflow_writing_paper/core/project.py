@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import subprocess
 import time
@@ -14,12 +15,18 @@ import yaml
 from .artifact import Artifact
 from .workspace import Workspace
 
+logger = logging.getLogger(__name__)
+
+REGISTRY_RULE = "цитируемы только поля value; note — пояснение, числа из него в текст не переносятся"
+
 # Стадия → артефакт, который она производит. experiments пишет в реестр, assembly — paper.md.
 STAGE_ARTIFACT = {"novelty": "novelty", "literature": "literature", "experiment_plan": "experiment_plan",
                   "draft": "draft", "review": "draft", "assembly": "paper"}
 
 
 class Project:
+    """Каталог проекта: манифест, артефакты с историей, реестр результатов, стадии и решения автора."""
+
     def __init__(self, ws: Workspace, path: str | Path) -> None:
         self.ws = ws
         self.path = Path(path).resolve()
@@ -44,7 +51,7 @@ class Project:
         tpl = yaml.safe_load(ws.text(f"templates/{template}.yaml")) or {}
         manifest = {"name": slug, "title": "", "language": language, "template": template, "journal": journal,
                     "chapter": None, "budget": {"tokens": 5_000_000, "usd": 20},
-                    "review": {"judges": 2, "threshold": 7.0, "auto_iterations": 2}, "roles": {},
+                    "review": {"judges": 2, "threshold": None, "auto_iterations": 2}, "roles": {},
                     "stages": tpl.get("stages") or [], "scenarios": []}
         for sub in ("artifacts/history", "artifacts/reviews", "calls", "style/samples"):
             (root / sub).mkdir(parents=True, exist_ok=True)
@@ -53,7 +60,7 @@ class Project:
         (root / "results.json").write_text("{}\n", encoding="utf-8")
         (root / "style" / "banned_phrases.txt").write_text(ws.text("style/banned_phrases.txt"), encoding="utf-8")
         if not (root / ".git").exists() and shutil.which("git"):
-            subprocess.run(["git", "init", "-q"], cwd=root, check=False, capture_output=True)
+            _git(root, "init", "-q")
         db = ws.db()
         db.execute("INSERT OR REPLACE INTO projects(slug, path, template) VALUES (?,?,?)", (slug, str(root), template))
         db.commit()
@@ -80,10 +87,12 @@ class Project:
         return self.path / "artifacts" / f"{type_}.md"
 
     def artifact(self, type_: str) -> Artifact | None:
+        """Текущая версия артефакта или None."""
         p = self.artifact_path(type_)
         return Artifact.parse(p.read_text(encoding="utf-8"), type_) if p.exists() else None
 
     def artifact_version(self, type_: str, version: int) -> Artifact | None:
+        """Конкретная версия: текущая или из history/."""
         cur = self.artifact(type_)
         if cur and cur.version == version:
             return cur
@@ -128,7 +137,7 @@ class Project:
                 self.update_artifact(art)
 
     def decide(self, type_: str, decision: str, reason: str | None = None) -> Artifact:
-        """Решение автора: approve | override | return | reject."""
+        """Решение автора: approve | override | return | reject. Одобрение коммитится в git проекта (без пуша)."""
         art = self.artifact(type_)
         if art is None:
             raise FileNotFoundError(type_)
@@ -155,15 +164,16 @@ class Project:
     def _git_commit(self, message: str) -> None:
         if not (self.path / ".git").exists() or not shutil.which("git"):
             return
-        subprocess.run(["git", "add", "-A"], cwd=self.path, check=False, capture_output=True)
-        subprocess.run(["git", "commit", "-q", "-m", message], cwd=self.path, check=False, capture_output=True)
+        _git(self.path, "add", "-A")
+        _git(self.path, "commit", "-q", "-m", message)
 
     # --- стадии ----------------------------------------------------------------------------
     def stages(self) -> list[dict[str, Any]]:
+        """Стадии манифеста в порядке выполнения."""
         return list(self.manifest.get("stages") or [])
 
     def stage_state(self, stage_id: str) -> str:
-        """done | skipped | in_review | in_progress | pending | stale."""
+        """done | complete | skipped | in_review | in_progress | pending | stale."""
         st = next((s for s in self.stages() if s["id"] == stage_id), None)
         if st is None:
             return "pending"
@@ -174,40 +184,67 @@ class Project:
         art = self.artifact(STAGE_ARTIFACT.get(stage_id, stage_id))
         if art is None:
             return "pending"
-        if stage_id == "draft":
-            return "done" if art.status == "approved" or self.draft_complete() else "in_progress"
+        if stage_id == "draft":  # complete — все разделы написаны, одобрения автора ещё нет
+            return "done" if art.status == "approved" else "complete" if self.draft_complete() else "in_progress"
         return {"approved": "done", "in_review": "in_review", "stale": "stale"}.get(art.status, "in_progress")
 
     def can_run(self, stage_id: str) -> tuple[bool, str]:
+        """Гейт: все обязательные стадии до этой завершены или пропущены."""
         for st in self.stages():
             if st["id"] == stage_id:
                 return True, ""
             state = self.stage_state(st["id"])
-            if st.get("required", True) and state not in ("done", "skipped"):
+            if st.get("required", True) and state not in ("done", "skipped", "complete"):
                 return False, f"стадия {st['id']} не завершена ({state})"
         return False, f"стадии {stage_id} нет в манифесте"
 
     def skip_stage(self, stage_id: str, reason: str) -> None:
+        """Пропустить необязательную стадию с указанием причины."""
         for st in self.manifest.get("stages") or []:
             if st["id"] == stage_id:
+                if st.get("required", True):
+                    raise ValueError(f"стадия {stage_id} обязательна, пропустить нельзя")
                 st["skipped"] = reason
         self.save_manifest()
 
     # --- журнал, реестр, профиль --------------------------------------------------------------
+    def review_settings(self) -> dict[str, Any]:
+        """judges, threshold (None — из рубрики), auto_iterations с дефолтами."""
+        return {"judges": 2, "threshold": None, "auto_iterations": 2, **(self.manifest.get("review") or {})}
+
+    def judge_candidates(self) -> list[str]:
+        """Судьи из манифеста проекта, иначе из providers.yaml."""
+        own = (self.manifest.get("roles") or {}).get("judge")
+        value = own or (self.ws.config().get("roles") or {}).get("judge") or []
+        return [value] if isinstance(value, str) else list(value)
+
+    def context_header(self, with_registry: bool) -> str:
+        """Профиль журнала (+ реестр результатов) — общий контекст для ролей и судей."""
+        parts = [f"## Профиль журнала\n{yaml.safe_dump(self.journal(), allow_unicode=True)}"]
+        if with_registry:
+            parts.append(f"## Реестр результатов — единственный источник чисел ({REGISTRY_RULE})\n"
+                         + json.dumps(self.registry_data(), ensure_ascii=False, indent=1))
+        return "\n\n".join(parts)
+
     def journal(self) -> dict[str, Any]:
+        """Профиль журнала из workspace/journals/ или defaults."""
         return yaml.safe_load(self.ws.text(f"journals/{self.manifest.get('journal', 'generic')}.yaml")) or {}
 
     def sections(self) -> list[str]:
+        """Разделы статьи из профиля журнала."""
         return [str(s) for s in self.journal().get("sections") or []]
 
     def draft_complete(self) -> bool:
+        """Все разделы профиля журнала присутствуют в черновике."""
         art = self.artifact("draft")
         return art is not None and all(f"## {s}" in art.body for s in self.sections())
 
     def registry_data(self) -> dict[str, Any]:
+        """Содержимое results.json."""
         return json.loads((self.path / "results.json").read_text(encoding="utf-8") or "{}")
 
     def role_provider(self, role: str) -> str | None:
+        """Провайдер роли: переопределение манифеста, иначе первый из providers.yaml."""
         own = (self.manifest.get("roles") or {}).get(role)
         if own:
             return str(own)
@@ -215,23 +252,33 @@ class Project:
         return cfg if isinstance(cfg, str) else (cfg[0] if cfg else None)
 
     def spent(self) -> dict[str, float]:
+        """Потрачено по журналу вызовов проекта: токены и доллары."""
         db = self.ws.db()
         row = db.execute("SELECT coalesce(sum(tokens_in + tokens_out), 0) t, coalesce(sum(cost_usd), 0) u "
                          "FROM calls WHERE project = ?", (self.slug,)).fetchone()
         db.close()
         return {"tokens": float(row["t"]), "usd": float(row["u"])}
 
-    def budget_left(self) -> tuple[bool, str]:
+    def budget_left(self, extra_usd: float = 0.0) -> tuple[bool, str]:
+        """Остаток бюджета; `extra_usd` — предварительная оценка предстоящего расхода."""
         budget = self.manifest.get("budget") or {}
         spent = self.spent()
         for key in ("tokens", "usd"):
-            if key in budget and spent[key] >= float(budget[key]):
-                return False, f"бюджет {key} исчерпан: {spent[key]:g} из {budget[key]}"
+            planned = spent[key] + (extra_usd if key == "usd" else 0.0)
+            if key in budget and planned >= float(budget[key]):
+                return False, f"бюджет {key} исчерпан: {planned:g} из {budget[key]}"
         return True, ""
 
     def style(self) -> dict[str, Any]:
+        """Образцы стиля автора (до трёх) и запрещённые фразы."""
         samples = sorted((self.path / "style" / "samples").glob("*.md"))
         banned_path = self.path / "style" / "banned_phrases.txt"
         banned = [ln.strip() for ln in banned_path.read_text(encoding="utf-8").splitlines()
                   if ln.strip() and not ln.startswith("#")] if banned_path.exists() else []
         return {"samples": [p.read_text(encoding="utf-8") for p in samples[:3]], "banned": banned}
+
+
+def _git(cwd: Path, *args: str) -> None:
+    proc = subprocess.run(["git", *args], cwd=cwd, check=False, capture_output=True, text=True)
+    if proc.returncode:
+        logger.warning("git %s в %s: %s", args[0], cwd, proc.stderr.strip()[-300:])

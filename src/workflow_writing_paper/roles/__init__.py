@@ -2,18 +2,18 @@
 
 from __future__ import annotations
 
-import json
+import logging
 import re
 import shutil
 import subprocess
 from collections.abc import Callable
 from typing import Any
 
-import yaml
-
 from ..core.project import Project
 from ..providers import Completion, Provider, ProviderError, build_pool, call_logged
 from ..review import ReviewError, review_artifact
+
+logger = logging.getLogger(__name__)
 
 
 class StageError(RuntimeError):
@@ -48,8 +48,8 @@ def call_role(project: Project, role: str, user: str, task: str | None = None,
     return comp, provider
 
 
-def _created_by(role: str, provider: Provider) -> dict[str, Any]:
-    return {"role": role, "provider": provider.id, "family": provider.family}
+def _created_by(role: str, provider: Provider, comp: Completion | None = None) -> dict[str, Any]:
+    return {"role": role, "provider": provider.id, "family": provider.family, "call": comp.log_path if comp else None}
 
 
 def _blockers_text(blockers: list[dict[str, Any]]) -> str:
@@ -58,16 +58,23 @@ def _blockers_text(blockers: list[dict[str, Any]]) -> str:
                      for b in blockers)
 
 
+def _low_score_notes(result: dict[str, Any]) -> list[dict[str, Any]]:
+    """Оценка ниже порога без блокеров: замечания судей становятся пунктами к правке."""
+    notes = [{"judge": jid, "issue": c} for jid, r in result["reports"].items() for c in (r.get("comments") or [])]
+    return notes or [{"judge": "review", "issue": f"итоговая оценка {result['min_overall']} ниже порога "
+                                                   f"{result['threshold']}"}]
+
+
 def _review_loop(project: Project, type_: str, task: str | None,
                  revise: Callable[[list[dict[str, Any]]], None]) -> dict[str, Any]:
     """Проверка; при блокерах — до auto_iterations правок ролью-автором, дальше человек."""
-    limit = int((project.manifest.get("review") or {}).get("auto_iterations", 2))
+    limit = int(project.review_settings()["auto_iterations"])
     try:
         result = review_artifact(project, type_, task)
         for _ in range(limit):
-            if result["accepted"] or not result["blockers"]:
-                break
-            revise(result["blockers"])
+            if result["accepted"] or (result["errors"] and not result["blockers"]):
+                break  # принято — или судей не хватило: правка текста это не исправит
+            revise(result["blockers"] or _low_score_notes(result))
             result = review_artifact(project, type_, task)
     except ReviewError as e:
         raise StageError(str(e)) from e
@@ -78,24 +85,23 @@ def _review_loop(project: Project, type_: str, task: str | None,
 def stage_novelty(project: Project, payload: dict[str, Any], task: str | None = None) -> dict[str, Any]:
     seed = str(payload.get("input") or "").strip()
     prev = project.artifact("novelty")
-    if not seed and prev is None:
+    source = seed or str((prev.meta.get("source") if prev else None) or "")  # только текст автора, не модели
+    if not source:
         raise StageError("нужен абзац новизны от автора (payload.input)")
-    source = seed or (prev.body if prev else "")
-    base = (f"## Профиль журнала\n{yaml.safe_dump(project.journal(), allow_unicode=True)}\n\n"
-            f"## Формулировка автора\n{source}")
+    base = f"{project.context_header(with_registry=False)}\n\n## Формулировка автора\n{source}"
     draft, provider = call_role(project, "ideator", base, task)
     critique, _ = call_role(project, "critic", f"{base}\n\n## Черновик новизны\n{draft.text}", task, 2500)
     final, provider = call_role(project, "ideator", f"{base}\n\n## Твой черновик\n{draft.text}\n\n"
                                 f"## Критика\n{critique.text}\n\nПерепиши черновик, ответив на критику: "
                                 "исправь обоснованное, аргументированно отклони спорное.", task)
-    project.write_artifact("novelty", final.text, _created_by("ideator", provider), source=source)
+    project.write_artifact("novelty", final.text, _created_by("ideator", provider, final), source=source)
 
     def revise(blockers: list[dict[str, Any]]) -> None:
         cur = project.artifact("novelty")
         text = cur.body if cur else ""
         fixed, p = call_role(project, "ideator", f"{base}\n\n## Текущая версия\n{text}\n\n## Блокеры проверки\n"
                              f"{_blockers_text(blockers)}\n\nИсправь все блокеры, остальное сохрани.", task)
-        project.write_artifact("novelty", fixed.text, _created_by("ideator", p))
+        project.write_artifact("novelty", fixed.text, _created_by("ideator", p, fixed))
 
     return _review_loop(project, "novelty", task, revise)
 
@@ -118,9 +124,7 @@ def merge_section(body: str, section: str, text: str, order: list[str]) -> str:
 
 
 def _draft_context(project: Project) -> str:
-    parts = [f"## Профиль журнала\n{yaml.safe_dump(project.journal(), allow_unicode=True)}",
-             "## Реестр результатов — единственный источник чисел (только поля value; note — пояснения)\n"
-             + json.dumps(project.registry_data(), ensure_ascii=False, indent=1)]
+    parts = [project.context_header(with_registry=True)]
     for t in ("novelty", "literature", "experiment_plan"):
         art = project.artifact(t)
         if art and art.status == "approved":
@@ -133,6 +137,14 @@ def _draft_context(project: Project) -> str:
     return "\n\n".join(parts)
 
 
+def _edit(project: Project, ctx: str, text: str, task: str | None) -> str:
+    """Проход редактора по разделу, если роль editor назначена; иначе текст без изменений."""
+    if not project.role_provider("editor"):
+        return text
+    edited, _ = call_role(project, "editor", f"{ctx}\n\n## Раздел для правки\n{text}", task, 6000)
+    return edited.text if edited.text.lstrip().startswith("## ") else text  # формат сломан — не берём
+
+
 def stage_draft(project: Project, payload: dict[str, Any], task: str | None = None) -> dict[str, Any]:
     section = str(payload.get("section") or "").strip()
     sections = project.sections()
@@ -143,8 +155,9 @@ def stage_draft(project: Project, payload: dict[str, Any], task: str | None = No
     body_prev = prev.body if prev else ""
     ask = f"{ctx}\n\n## Уже написанные разделы\n{body_prev or '(пусто)'}\n\nНапиши раздел «{section}»."
     comp, provider = call_role(project, "section_writer", ask, task, 6000)
-    project.write_artifact("draft", merge_section(body_prev, section, comp.text, sections),
-                           _created_by("section_writer", provider))
+    text = _edit(project, ctx, comp.text, task)
+    project.write_artifact("draft", merge_section(body_prev, section, text, sections),
+                           _created_by("section_writer", provider, comp))
 
     def revise(blockers: list[dict[str, Any]]) -> None:
         cur = project.artifact("draft")
@@ -153,7 +166,7 @@ def stage_draft(project: Project, payload: dict[str, Any], task: str | None = No
                              f"## Блокеры проверки\n{_blockers_text(blockers)}\n\nИсправь блокеры в разделе «{section}»"
                              " и верни только этот раздел целиком.", task, 6000)
         project.write_artifact("draft", merge_section(text, section, fixed.text, sections),
-                               _created_by("section_writer", p))
+                               _created_by("section_writer", p, fixed))
 
     return _review_loop(project, "draft", task, revise)
 
@@ -186,6 +199,8 @@ def stage_assembly(project: Project, payload: dict[str, Any], task: str | None =
                               capture_output=True, text=True)
         if proc.returncode == 0:
             outputs.append(out.name)
+        else:
+            logger.warning("pandoc: %s", proc.stderr.strip()[-300:])
     return {"accepted": True, "outputs": outputs, "version": art.version}
 
 

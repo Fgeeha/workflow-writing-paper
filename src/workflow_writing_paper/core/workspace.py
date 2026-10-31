@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS projects (
     slug TEXT PRIMARY KEY, path TEXT, template TEXT, created_at TEXT DEFAULT (datetime('now'))
 );
 CREATE TABLE IF NOT EXISTS tasks (
-    id INTEGER PRIMARY KEY, project TEXT, stage TEXT, role TEXT, status TEXT, payload TEXT, result TEXT,
+    id INTEGER PRIMARY KEY, project TEXT, stage TEXT, status TEXT, payload TEXT, result TEXT,
     created_at TEXT DEFAULT (datetime('now')), started_at TEXT, finished_at TEXT, error TEXT
 );
 CREATE TABLE IF NOT EXISTS approvals (

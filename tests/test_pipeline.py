@@ -1,6 +1,7 @@
 """Сквозной сценарий v0.2 на провайдере fake: новизна → проверка семействами → одобрение → раздел черновика."""
 
 import json
+from pathlib import Path
 
 import yaml
 
@@ -39,14 +40,15 @@ POOL = {
 }
 
 
-def make(tmp_path, pool=POOL):
+def make(tmp_path: Path, pool: dict | None = None) -> tuple[Workspace, Project]:
+    pool = pool or POOL
     ws = Workspace(tmp_path / "ws")
     ws.init()
     (ws.root / "providers.yaml").write_text(yaml.safe_dump(pool, allow_unicode=True), encoding="utf-8")
     return ws, Project.create(ws, "demo", template="experimental")
 
 
-def set_reply(ws, pid, reply):
+def set_reply(ws: Workspace, pid: str, reply: str) -> None:
     cfg = ws.config()
     next(p for p in cfg["providers"] if p["id"] == pid)["reply"] = reply
     ws.save_config(cfg)
@@ -67,7 +69,7 @@ def test_end_to_end_novelty_then_draft(tmp_path):
     art = project.artifact("novelty")
     assert art.version == 1 and art.status == "in_review"
     assert art.meta["created_by"]["family"] == "a"
-    assert art.meta["source"].startswith("Мы ускорили")
+    assert art.meta["source"].startswith("Мы ускорили") and art.meta["created_by"]["call"].endswith(".json")
     judges = {json.loads((project.path / p).read_text())["judge"]["provider"] for p in art.meta["reviews"]}
     assert judges == {"judge-x", "judge-y", "checker"}  # judge-a (семейство автора) исключён
     assert art.meta["review_summary"]["accepted"] and art.meta["review_summary"]["min_overall"] == 8.0
@@ -87,6 +89,11 @@ def test_end_to_end_novelty_then_draft(tmp_path):
     draft = project.artifact("draft")
     assert "## Эксперимент" in draft.body and draft.status == "in_review"
     assert project.stage_state("draft") == "in_progress"  # не все разделы журнала написаны
+    try:
+        project.skip_stage("draft", "нельзя")
+        raise AssertionError("обязательную стадию пропустили")
+    except ValueError:
+        pass
 
 
 def test_checker_blocks_number_not_in_registry_and_banned_phrase(tmp_path):
@@ -108,10 +115,11 @@ def test_checker_blocks_number_not_in_registry_and_banned_phrase(tmp_path):
 def test_check_numbers_rules():
     reg = {"f1": {"value": 0.8234}, "lat": {"value": 103.32}, "n": {"value": 1200}}
     text = ("## Результаты 2024\n1. Три прогона, 5 моделей.\n"
-            "F1 = 0,82, задержка 103,3 мс, выборка 1200 изображений [Иванов, 2021].\n"
-            "`code 999` и формула $x = 42.5$ не считаются.\nТочность 97,1 % — {pending}.\nПлохо: 0,65.\n")
+            "F1 = 0,82, задержка 103,3 мс, выборка 1200 изображений [Иванов, 2021] (Smith et al., 2020a).\n"
+            "`code 999` и формула $x = 42.5$ не считаются.\nТочность 97,1 % — {pending}.\nПлохо: 0,65.\n"
+            "Скобки не прячут числа: (задержка 95,5 мс на 1000 снимках).\n")
     bl = check_numbers(text, reg, rounding=2)
-    assert [b["number"] for b in bl] == ["0,65"]
+    assert [b["number"] for b in bl] == ["0,65", "95,5", "1000"]
 
 
 def test_merge_section_order_and_replace():
@@ -208,7 +216,7 @@ def test_review_and_assembly_stages(tmp_path):
         project.skip_stage(st, "тест")
     body = "\n\n".join(f"## {s}\n\nТекст раздела без чисел." for s in project.sections())
     project.write_artifact("draft", body, by)
-    assert project.stage_state("draft") == "done"
+    assert project.stage_state("draft") == "complete"  # написан, но не одобрен
     res = run_task(ws, enqueue(ws, "demo", "review"))
     assert res["error"] is None and res["accepted"]
     assert project.artifact("draft").status == "in_review"
@@ -225,3 +233,41 @@ def test_review_and_assembly_stages(tmp_path):
     # перепроверка любого артефакта без гейта
     res = run_task(ws, enqueue(ws, "demo", "review", {"artifact": "novelty"}, gate=False))
     assert res["error"] is None and res["accepted"]
+
+
+def test_review_locates_quotes_threshold_and_budget(tmp_path):
+    from workflow_writing_paper.review import _locate, review_artifact
+
+    body = "## Введение\n\nПервая строка.\nЗадержка 95 мс без источника.\n"
+    bl = _locate([{"quote": "задержка 95 мс", "issue": "x"}, {"quote": "нет такого", "issue": "y"}], body)
+    assert bl[0]["line"] == 4 and bl[1]["line"] is None
+
+    ws, project = make(tmp_path)
+    project.manifest["review"]["threshold"] = 8.5  # манифест перекрывает порог рубрики (7.0)
+    project.save_manifest()
+    project.write_artifact("novelty", NOVELTY_OK, {"role": "ideator", "provider": "writer", "family": "a"})
+    res = review_artifact(project, "novelty")
+    assert res["threshold"] == 8.5 and not res["accepted"] and res["min_overall"] == 8.0
+
+    project.manifest["budget"] = {"usd": 0.0}
+    project.save_manifest()
+    cfg = ws.config()
+    for p in cfg["providers"]:
+        p["price"] = {"input_per_1m": 1.0, "output_per_1m": 1.0}
+    ws.save_config(cfg)
+    try:
+        review_artifact(project, "novelty")
+        raise AssertionError("проверка пошла при исчерпанном бюджете")
+    except Exception as e:  # noqa: BLE001
+        assert "оценка стоимости" in str(e)
+
+
+def test_novelty_rerun_uses_author_source_not_model_text(tmp_path):
+    ws, project = make(tmp_path)
+    run_task(ws, enqueue(ws, "demo", "novelty", {"input": "Исходный абзац автора."}))
+    run_task(ws, enqueue(ws, "demo", "novelty", {}))  # перезапуск без ввода
+    art = project.artifact("novelty")
+    assert art.version == 2 and art.meta["source"] == "Исходный абзац автора."
+    ws2, _ = make(tmp_path / "second")
+    res = run_task(ws2, enqueue(ws2, "demo", "novelty", {}))
+    assert "нужен абзац новизны" in res["error"]
