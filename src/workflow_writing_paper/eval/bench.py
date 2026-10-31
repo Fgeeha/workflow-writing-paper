@@ -244,7 +244,7 @@ def summary(db: Any, role: str, run: str | None = None) -> tuple[list[dict[str, 
         by.setdefault(r["provider"], []).append(r)
     table = []
     for pid, rs in sorted(by.items()):
-        ok = [r for r in rs if r["answer_path"]]
+        ok = [r for r in rs if r["answer_path"] and not r["error"]]  # ошибка вызова, языка или нехватки судей
         cov = [r["coverage"] for r in ok if r["coverage"] is not None]
         table.append({
             "provider": pid, "family": rs[0]["family"], "n": len(ok), "errors": len(rs) - len(ok),
