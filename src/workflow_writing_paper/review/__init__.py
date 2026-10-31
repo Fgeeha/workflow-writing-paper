@@ -92,7 +92,7 @@ def review_artifact(project: Project, type_: str, task: str | None = None) -> di
     art = project.artifact(type_)
     if art is None:
         raise ReviewError(f"артефакта {type_} нет")
-    pool = build_pool(project.ws.config())
+    pool = build_pool(project.ws.config(), text=project.ws.text)
     settings = project.review_settings()
     n = int(settings["judges"])
     rubric = project.ws.text(f"rubrics/{type_}.md")

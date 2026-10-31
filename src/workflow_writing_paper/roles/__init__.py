@@ -23,7 +23,7 @@ class StageError(RuntimeError):
 # --- вызов роли -----------------------------------------------------------------------------
 def _provider(project: Project, role: str) -> Provider:
     pid = project.role_provider(role)
-    pool = build_pool(project.ws.config())
+    pool = build_pool(project.ws.config(), text=project.ws.text)
     if not pid or pid not in pool:
         raise StageError(f"на роль {role} не назначен доступный провайдер (providers.yaml → roles)")
     return pool[pid]

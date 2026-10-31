@@ -69,6 +69,7 @@ class Provider:
         self.id: str = cfg["id"]
         self.family: str = cfg.get("family") or self.id
         self.model: str = str(cfg.get("model", ""))
+        self.system_prefix: str = str(cfg.get("system_prefix", ""))  # текст перед системным промптом (скилл)
 
     def _call(self, messages: list[Message], *, json_schema: dict | None, max_tokens: int,
               temperature: float, seed: int | None) -> tuple[str, int, int]:
@@ -98,6 +99,11 @@ class Provider:
     def complete(self, messages: list[Message], *, json_schema: dict | None = None,
                  max_tokens: int = 2048, temperature: float = 0.2, seed: int | None = None) -> Completion:
         msgs = list(messages)
+        if self.system_prefix:
+            if msgs and msgs[0]["role"] == "system":
+                msgs[0] = {"role": "system", "content": self.system_prefix + "\n\n" + msgs[0]["content"]}
+            else:
+                msgs.insert(0, {"role": "system", "content": self.system_prefix})
         if json_schema is not None:
             hint = ("Ответь только JSON-объектом без пояснений, по схеме:\n"
                     + json.dumps(json_schema, ensure_ascii=False))

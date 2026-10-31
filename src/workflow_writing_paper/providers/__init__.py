@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +27,9 @@ KINDS: dict[str, type[Provider]] = {
 }
 
 
-def build_pool(cfg: dict[str, Any], include_disabled: bool = False) -> dict[str, Provider]:
+def build_pool(cfg: dict[str, Any], include_disabled: bool = False,
+               text: Callable[[str], str] | None = None) -> dict[str, Provider]:
+    """`text` читает файл workspace по относительному пути; нужен для `system_prefix_file` у провайдера."""
     pool: dict[str, Provider] = {}
     for item in cfg.get("providers") or []:
         if not include_disabled and item.get("enabled", True) is False:
@@ -35,6 +38,10 @@ def build_pool(cfg: dict[str, Any], include_disabled: bool = False) -> dict[str,
         if kind not in KINDS:
             raise ValueError(f"провайдер {item.get('id')}: неизвестный kind {kind!r}; допустимо {sorted(KINDS)}")
         pool[item["id"]] = KINDS[kind](item)
+        if item.get("system_prefix_file"):
+            if text is None:
+                raise ValueError(f"провайдер {item['id']}: system_prefix_file требует загрузчик текста")
+            pool[item["id"]].system_prefix = text(str(item["system_prefix_file"])).strip()
     return pool
 
 

@@ -63,7 +63,7 @@ def run_bench(ws: Workspace, role: str, provider_ids: list[str], n_judges: int =
     ponytail: последовательно; облачные модели можно гонять параллельно, если стенд станет медленным.
     """
     cfg = ws.config()
-    pool = build_pool(cfg)
+    pool = build_pool(cfg, text=ws.text)
     unknown = [p for p in provider_ids if p not in pool]
     if unknown:
         raise ValueError(f"нет в пуле (или выключены): {', '.join(unknown)}")

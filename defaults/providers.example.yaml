@@ -2,6 +2,7 @@
 # kind: ollama | openai | openrouter | gigachat | codex-cli | claude-cli | opencode-cli | generic-cli | fake
 # family — семейство модели: судья не проверяет работу своего семейства. Дистилляты относите к семейству учителя.
 # gpu: true — вызовы строго по одному; exclusive_group — провайдеры, которые нельзя гонять одновременно.
+# system_prefix_file — файл workspace (или defaults), текст которого ставится перед системным промптом роли.
 
 providers:
   - id: ollama-gemma4-12b
@@ -51,6 +52,17 @@ providers:
     gpu: true
     exclusive_group: local-gpu
     num_ctx: 32768
+
+  # Вариант с методической надстройкой K-Dense (defaults/skills/kdense/*.md): та же модель, та же семья,
+  # текст скилла подставляется перед системным промптом роли. Сравнивать на стенде с базовым провайдером.
+  - id: ollama-gemma4-12b-kd-critic
+    kind: ollama
+    family: gemma
+    model: gemma4:12b
+    gpu: true
+    exclusive_group: local-gpu
+    num_ctx: 32768
+    system_prefix_file: skills/kdense/critic.md
 
   - id: ollama-gpt-oss-20b
     kind: ollama

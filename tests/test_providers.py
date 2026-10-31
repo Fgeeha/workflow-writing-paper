@@ -95,3 +95,22 @@ def test_unclosed_think_is_error():
     pool = build_pool({"providers": [{"id": "t", "kind": "fake", "reply": "<think>рассуждаю и не успеваю"}]})
     with pytest.raises(ProviderError, match="рассуждения"):
         pool["t"].complete([{"role": "user", "content": "x"}])
+
+
+def test_system_prefix_file_prepends_to_system_message():
+    seen: list[list[dict]] = []
+    pool = build_pool({"providers": [{"id": "p", "kind": "fake", "system_prefix_file": "skills/x.md"}]},
+                      text=lambda rel: f"PREFIX {rel}\n")
+    prov = pool["p"]
+    orig = prov._call
+
+    def spy(messages, **kw):
+        seen.append(list(messages))
+        return orig(messages, **kw)
+    prov._call = spy  # type: ignore[method-assign]
+    prov.complete([{"role": "system", "content": "ROLE"}, {"role": "user", "content": "q"}])
+    prov.complete([{"role": "user", "content": "q"}])
+    assert seen[0][0] == {"role": "system", "content": "PREFIX skills/x.md\n\nROLE"}
+    assert seen[1][0] == {"role": "system", "content": "PREFIX skills/x.md"} and seen[1][1]["role"] == "user"
+    with pytest.raises(ValueError):
+        build_pool({"providers": [{"id": "p", "kind": "fake", "system_prefix_file": "skills/x.md"}]})

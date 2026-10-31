@@ -45,7 +45,7 @@ def create_app(ws: Workspace | None = None, worker: bool = True) -> FastAPI:
 
     @app.get("/pool/ping/{pid}", response_class=HTMLResponse)
     def ping(pid: str) -> str:
-        pool = build_pool(ws.config(), include_disabled=True)
+        pool = build_pool(ws.config(), include_disabled=True, text=ws.text)
         if pid not in pool:
             raise HTTPException(404)
         ok, msg = pool[pid].ping()
