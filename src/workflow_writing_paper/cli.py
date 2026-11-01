@@ -7,6 +7,7 @@ import logging
 import sys
 
 from .core import Workspace
+from .library import LibraryError
 
 
 def _fmt(value: float | None, pattern: str) -> str:
@@ -104,7 +105,7 @@ def cmd_check(ws: Workspace, args: argparse.Namespace) -> int:
 
     project = Project.open(ws, args.slug)
     code = 0
-    for type_ in args.artifacts or ("novelty", "draft"):
+    for type_ in args.artifacts or ("novelty", "literature", "experiment_plan", "draft", "paper"):
         art = project.artifact(type_)
         if art is None:
             continue
@@ -114,6 +115,27 @@ def cmd_check(ws: Workspace, args: argparse.Namespace) -> int:
             print(f"  - строка {b['line']}: {b['issue']}" + (f" — «{b['quote']}»" if b.get("quote") else ""))
         code |= bool(blockers)
     return code
+
+
+def cmd_lib(ws: Workspace, args: argparse.Namespace) -> int:
+    from .library import Library
+
+    lib = Library(ws.root / "library")
+    if args.lib_cmd == "import":
+        for path in args.paths:
+            res = lib.import_path(path)
+            print(f"{path}: добавлено {', '.join(res['added']) or '—'}"
+                  + (f"; пропущено {', '.join(res['skipped'])}" if res["skipped"] else "")
+                  + ("" if res.get("has_text", True) else "; текст PDF не извлечён")
+                  + ("; запись-заглушка, уточните через OpenAlex" if res.get("matched") is False else ""))
+        return 0
+    if args.lib_cmd == "search":
+        hits = lib.search(" ".join(args.query))
+        for h in hits:
+            print(f"[@{h['key']}] {h['title']} ({h['year']})" + (f"\n    {h['snippet']}" if h["snippet"] else ""))
+        return 0 if hits else 1
+    print(f"записей: {lib.reindex()}")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -145,14 +167,19 @@ def main(argv: list[str] | None = None) -> int:
     check = sub.add_parser("check", help="только детерминированные проверки артефактов")
     check.add_argument("slug")
     check.add_argument("artifacts", nargs="*")
+    lib = sub.add_parser("lib", help="библиотека: импорт .bib/.pdf, поиск, переиндексация")
+    lib_sub = lib.add_subparsers(dest="lib_cmd", required=True)
+    lib_sub.add_parser("import", help="импортировать файлы .bib и .pdf").add_argument("paths", nargs="+")
+    lib_sub.add_parser("search", help="полнотекстовый поиск").add_argument("query", nargs="+")
+    lib_sub.add_parser("reindex", help="пересобрать index.sqlite из refs.bib и pdf/")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     ws = Workspace(args.workspace)
     handlers = {"init": cmd_init, "serve": cmd_serve, "bench": cmd_bench, "new": cmd_new, "run": cmd_run,
-                "check": cmd_check, "review": cmd_review}
+                "check": cmd_check, "review": cmd_review, "lib": cmd_lib}
     try:
         return handlers[args.cmd](ws, args)
-    except (FileNotFoundError, FileExistsError, ValueError) as e:
+    except (FileNotFoundError, FileExistsError, ValueError, LibraryError) as e:
         print(f"ошибка: {e}", file=sys.stderr)
         return 2
 

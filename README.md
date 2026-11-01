@@ -5,7 +5,8 @@
 план экспериментов и черновик статьи; каждый артефакт проверяют модели других семейств,
 а принимает человек. Статьи размечаются привязкой к главам и становятся контурами диссертации.
 
-Состояние: v0.2 — проекты, стадии, артефакты, проверка семействами, реестр результатов.
+Состояние: v0.3 — библиотека (PDF, BibTeX, FTS5, OpenAlex), стадии `literature` и `experiment_plan`,
+проверка ключей цитирования без модели.
 Техническое задание — [docs/PLAN.md](docs/PLAN.md).
 
 ## Принципы
@@ -14,7 +15,7 @@
 - Человек в контуре: гейт на границе стадий и при превышении бюджета.
 - Числа в тексте только из реестра результатов проекта; проверка без модели.
 - Семейство модели, создавшей артефакт, не участвует в его проверке.
-- Минимум зависимостей: FastAPI, Jinja2, HTMX, SQLite, pymupdf, PyYAML.
+- Минимум зависимостей: FastAPI, Jinja2, HTMX, SQLite (FTS5), PyYAML; PDF — через внешний pdftotext.
 
 ## Запуск
 
@@ -27,14 +28,20 @@ uv run wwp bench --role critic --providers ollama-gemma4-12b,ollama-qwen3-14b,ol
 uv run wwp new my-paper --template experimental   # проект в workspace/projects/my-paper
 uv run wwp run my-paper novelty --input "абзац новизны"   # стадия без сервера
 uv run wwp check my-paper  # только детерминированные проверки
+uv run wwp lib import ~/papers/*.bib ~/papers/*.pdf   # библиотека: refs.bib, pdf/, индекс FTS5
+uv run wwp lib search квантование edge               # полнотекстовый поиск по библиотеке
 uv run pytest              # тесты на провайдере fake, без GPU и ключей
 ```
 
-Сквозной путь v0.2: автор вводит новизну → ideator → critic → ideator → `novelty.md` → два судьи
+Сквозной путь: автор вводит новизну → ideator → critic → ideator → `novelty.md` → два судьи
 других семейств + детерминированный `checker` → решение автора (одобрить / override / вернуть /
-отклонить) → разделы черновика по профилю журнала с числами только из `results.json` →
-`review` → `assembly` (`paper.md`, `paper.docx` через pandoc). Стадии `literature`,
-`experiment_plan`, `experiments` появятся в v0.3–v0.4, пока пропускаются с указанием причины.
+отклонить) → `literature.md` по библиотеке автора (literature_scout: запросы → FTS5 по `refs.bib`
+и PDF → обзор только с ключами `[@ключ]`; недостающие работы ищутся в OpenAlex и ждут подтверждения)
+→ `experiment_plan.md` (эксперимент, метрика, базовые линии и ключ реестра на каждое утверждение)
+→ разделы черновика по профилю журнала с числами только из `results.json` → `review` → `assembly`
+(`paper.md`, `paper.docx` через pandoc с `--citeproc` по `refs.bib`). Выдуманная ссылка —
+ключ, которого нет в `refs.bib` — блокер в любом артефакте без участия модели. Стадия
+`experiments` появится в v0.4, пока пропускается с указанием причины.
 
 Провайдеры (`kind`): `ollama`, `ollama-decision` (decision-модели ollama вроде `kev` — только как судьи),
 `openai` (любой OpenAI-совместимый сервер), `openrouter`, `gigachat`, `codex-cli`, `claude-cli`,
@@ -54,7 +61,7 @@ uv run pytest              # тесты на провайдере fake, без G
 |---|---|
 | v0.1 | пул провайдеров, стенд сравнения моделей по ролям |
 | v0.2 | проекты, стадии, артефакты, проверка семействами, реестр результатов |
-| v0.3 | библиотека: PDF, BibTeX, FTS5, OpenAlex |
+| v0.3 | библиотека: PDF, BibTeX, FTS5, OpenAlex; стадии `literature`, `experiment_plan`; проверка ключей `[@key]` |
 | v0.4 | запуск зарегистрированных сценариев экспериментов, локально и по SSH |
 
 ## Лицензия

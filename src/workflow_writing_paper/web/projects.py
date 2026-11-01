@@ -16,12 +16,13 @@ from ..core import Artifact, Project, Workspace
 from ..core.engine import enqueue
 from ..core.project import STAGE_ARTIFACT
 from ..core.workspace import DEFAULTS
+from ..library import Library
 from ..registry import add_manual
 from ..roles import NOT_YET
 
 Render = Callable[..., HTMLResponse]
 
-SETTINGS_DIRS = ("prompts", "rubrics", "journals", "templates", "eval/tasks", "style")
+SETTINGS_DIRS = ("prompts", "rubrics", "journals", "templates", "eval/tasks", "style", "skills", "library/refs.bib")
 ARTIFACT_TYPES = tuple(dict.fromkeys(STAGE_ARTIFACT.values()))
 
 
@@ -231,6 +232,8 @@ def register(app: FastAPI, ws: Workspace, render: Render) -> None:
         for base in (ws.root, DEFAULTS):
             for d in SETTINGS_DIRS:
                 rels |= {p.relative_to(base).as_posix() for p in (base / d).rglob("*") if p.is_file()}
+        if (ws.root / "library" / "refs.bib").exists():
+            rels.add("library/refs.bib")
         files = [{"rel": rel, "overridden": (ws.root / rel).exists()} for rel in sorted(rels)]
         return render(request, "settings.html", files=files)
 
@@ -250,4 +253,6 @@ def register(app: FastAPI, ws: Workspace, render: Render) -> None:
         target = ws.root / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(str(form.get("text") or "").replace("\r\n", "\n"), encoding="utf-8")
+        if rel == "library/refs.bib":
+            Library(ws.root / "library").reindex()
         return RedirectResponse(f"/settings/edit?rel={rel}", status_code=303)

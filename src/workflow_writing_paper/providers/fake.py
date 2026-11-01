@@ -13,6 +13,7 @@ class FakeProvider(Provider):
     """Текст: `reply` из конфига или эхо с хэшем. JSON: объект по схеме, числа = `score`.
 
     `bad_json: N` — первые N JSON-ответов намеренно не JSON (проверка повторов).
+    `json_reply` — объект, который возвращается на любой запрос со схемой вместо заполнения схемы.
     """
 
     kind = "fake"
@@ -30,6 +31,8 @@ class FakeProvider(Provider):
         elif self._bad_left > 0:
             self._bad_left -= 1
             text = "не JSON"
+        elif self.cfg.get("json_reply") is not None:
+            text = json.dumps(self.cfg["json_reply"], ensure_ascii=False)
         else:
             text = json.dumps(self._fill(json_schema, f"{self.id} {digest}"), ensure_ascii=False)
         return text, len(prompt) // 4, len(text) // 4

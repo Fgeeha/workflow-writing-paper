@@ -1,7 +1,7 @@
 # Теоретическая статья: доказательства вместо экспериментов
 stages:
   - {id: novelty,    required: true}
-  - {id: literature, required: false}   # v0.3
+  - {id: literature, required: false}
   - {id: draft,      required: true}
   - {id: review,     required: true}
   - {id: assembly,   required: true}

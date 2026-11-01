@@ -1,4 +1,4 @@
-"""Веб-интерфейс: пул моделей, стенд, журнал вызовов (здесь); проекты и артефакты — web/projects.py."""
+"""Веб-интерфейс: пул моделей, стенд, журнал вызовов (здесь); проекты — web/projects.py; библиотека — web/library.py."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from ..core import Workspace
 from ..core.engine import Worker
 from ..eval import run_bench, summary
 from ..providers import build_pool, role_providers
+from .library import register_library
 from .projects import register
 
 logger = logging.getLogger(__name__)
@@ -203,4 +204,5 @@ def create_app(ws: Workspace | None = None, worker: bool = True) -> FastAPI:
         return render(request, "call.html", title=f"Вызов {cid} · {row['role']} · {row['provider']}", blocks=blocks)
 
     register(app, ws, render)
+    register_library(app, ws, render)
     return app

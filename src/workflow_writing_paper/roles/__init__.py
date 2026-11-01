@@ -1,4 +1,4 @@
-"""Роли: сборка контекста кодом, вызов назначенной модели, реализация стадий novelty / draft / review / assembly."""
+"""Роли: сборка контекста кодом, вызов назначенной модели, стадии novelty / literature / experiment_plan / draft / review / assembly."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from collections.abc import Callable
 from typing import Any
 
 from ..core.project import Project
+from ..library import Library
 from ..providers import Completion, Provider, ProviderError, build_pool, call_logged
 from ..review import ReviewError, review_artifact
 
@@ -30,7 +31,7 @@ def _provider(project: Project, role: str) -> Provider:
 
 
 def call_role(project: Project, role: str, user: str, task: str | None = None,
-              max_tokens: int = 4000) -> tuple[Completion, Provider]:
+              max_tokens: int = 4000, **kwargs: Any) -> tuple[Completion, Provider]:
     ok, why = project.budget_left()
     if not ok:
         raise StageError(why)
@@ -40,7 +41,7 @@ def call_role(project: Project, role: str, user: str, task: str | None = None,
     db = project.ws.db()
     try:
         comp = call_logged(provider, messages, role=role, log_dir=project.path / "calls", db=db,
-                           project=project.slug, task=task, max_tokens=max_tokens, temperature=0.3)
+                           project=project.slug, task=task, max_tokens=max_tokens, temperature=0.3, **kwargs)
     except ProviderError as e:
         raise StageError(f"{role} ({provider.id}): {e}") from e
     finally:
@@ -81,6 +82,34 @@ def _review_loop(project: Project, type_: str, task: str | None,
     return result
 
 
+def _author_critic_author(project: Project, role: str, base: str, task: str | None,
+                          max_tokens: int = 4000) -> tuple[Completion, Provider]:
+    """Роль пишет черновик, critic его разбирает, роль переписывает с ответом на критику."""
+    draft, _ = call_role(project, role, base, task, max_tokens)
+    critique, _ = call_role(project, "critic", f"{base}\n\n## Черновик\n{draft.text}", task, 2500)
+    return call_role(project, role, f"{base}\n\n## Твой черновик\n{draft.text}\n\n## Критика\n{critique.text}\n\n"
+                     "Перепиши черновик, ответив на критику: исправь обоснованное, аргументированно отклони спорное.",
+                     task, max_tokens)
+
+
+def _reviser(project: Project, type_: str, role: str, base: str, task: str | None,
+             max_tokens: int = 4000) -> Callable[[list[dict[str, Any]]], None]:
+    """Правка артефакта ролью-автором по блокерам проверки — шаг цикла `_review_loop`."""
+    def revise(blockers: list[dict[str, Any]]) -> None:
+        cur = project.artifact(type_)
+        fixed, p = call_role(project, role, f"{base}\n\n## Текущая версия\n{cur.body if cur else ''}\n\n"
+                             f"## Блокеры проверки\n{_blockers_text(blockers)}\n\nИсправь все блокеры, остальное сохрани.",
+                             task, max_tokens)
+        project.write_artifact(type_, fixed.text, _created_by(role, p, fixed))
+    return revise
+
+
+def _approved(project: Project, type_: str, title: str) -> str:
+    """Раздел контекста из одобренного артефакта; пустая строка, если его нет или он не одобрен."""
+    art = project.artifact(type_)
+    return f"## {title}\n{art.body}" if art and art.status == "approved" else ""
+
+
 # --- novelty --------------------------------------------------------------------------------
 def stage_novelty(project: Project, payload: dict[str, Any], task: str | None = None) -> dict[str, Any]:
     seed = str(payload.get("input") or "").strip()
@@ -89,21 +118,71 @@ def stage_novelty(project: Project, payload: dict[str, Any], task: str | None = 
     if not source:
         raise StageError("нужен абзац новизны от автора (payload.input)")
     base = f"{project.context_header(with_registry=False)}\n\n## Формулировка автора\n{source}"
-    draft, provider = call_role(project, "ideator", base, task)
-    critique, _ = call_role(project, "critic", f"{base}\n\n## Черновик новизны\n{draft.text}", task, 2500)
-    final, provider = call_role(project, "ideator", f"{base}\n\n## Твой черновик\n{draft.text}\n\n"
-                                f"## Критика\n{critique.text}\n\nПерепиши черновик, ответив на критику: "
-                                "исправь обоснованное, аргументированно отклони спорное.", task)
+    final, provider = _author_critic_author(project, "ideator", base, task)
     project.write_artifact("novelty", final.text, _created_by("ideator", provider, final), source=source)
+    return _review_loop(project, "novelty", task, _reviser(project, "novelty", "ideator", base, task))
 
-    def revise(blockers: list[dict[str, Any]]) -> None:
-        cur = project.artifact("novelty")
-        text = cur.body if cur else ""
-        fixed, p = call_role(project, "ideator", f"{base}\n\n## Текущая версия\n{text}\n\n## Блокеры проверки\n"
-                             f"{_blockers_text(blockers)}\n\nИсправь все блокеры, остальное сохрани.", task)
-        project.write_artifact("novelty", fixed.text, _created_by("ideator", p, fixed))
 
-    return _review_loop(project, "novelty", task, revise)
+# --- literature -----------------------------------------------------------------------------
+QUERIES_SCHEMA = {"type": "object", "properties": {"queries": {"type": "array", "items": {"type": "string"}}},
+                  "required": ["queries"]}
+
+
+def _library_records(lib: Library, queries: list[str]) -> str:
+    """Записи по FTS5-запросам, одна строка на ключ; заглушки PDF без метаданных модели не показываются."""
+    citable = lib.citable_keys()
+    found: dict[str, dict[str, Any]] = {}
+    for q in queries:
+        for hit in lib.search(q, 8):
+            if hit["key"] in citable:
+                found.setdefault(hit["key"], hit)
+    if not found:
+        return "(по этим запросам в библиотеке ничего нет — напиши, какие работы нужно импортировать)"
+    return "\n".join(f"- [@{k}] {h['title']} ({h['year']}; {h['authors']}) — {h['snippet']}" for k, h in found.items())
+
+
+def stage_literature(project: Project, payload: dict[str, Any], task: str | None = None) -> dict[str, Any]:
+    """literature_scout: запросы → поиск в библиотеке (и OpenAlex на подтверждение) → обзор только по ключам refs.bib."""
+    novelty = project.artifact("novelty")
+    if novelty is None:
+        raise StageError("нет артефакта novelty")
+    lib = Library(project.ws.root / "library")
+    hint = str(payload.get("input") or "").strip()
+    base = f"{project.context_header(with_registry=False)}\n\n## Новизна\n{novelty.body}"
+    if hint:
+        base += f"\n\n## Указания автора\n{hint}"
+    comp, _ = call_role(project, "literature_scout", f"{base}\n\nСформулируй 3–6 коротких поисковых запросов "
+                        "(2–5 слов, на языке литературы по теме) для поиска близких работ. Ответ — JSON {\"queries\": [...]}.",
+                        task, 600, json_schema=QUERIES_SCHEMA)
+    queries = [str(q).strip() for q in (comp.data or {}).get("queries", []) if str(q).strip()][:6]
+    queries = queries or [str(novelty.meta.get("source") or novelty.body)[:120]]
+    settings = project.ws.config().get("library") or {}
+    suggested = sum(lib.fetch_openalex(q, project.slug, settings) for q in queries[:3])
+    ask = (f"{base}\n\n## Записи библиотеки — цитировать только их, строго в форме [@ключ]\n{_library_records(lib, queries)}"
+           "\n\nНапиши обзор литературы по шаблону системного промпта. Работы, которых нет в списке, не цитируй: "
+           "назови их в разделе «Пробелы» как кандидатов на импорт.")
+    final, provider = _author_critic_author(project, "literature_scout", ask, task, 5000)
+    project.write_artifact("literature", final.text, _created_by("literature_scout", provider, final))
+    result = _review_loop(project, "literature", task, _reviser(project, "literature", "literature_scout", ask, task, 5000))
+    return {**result, "queries": queries, "openalex_suggested": suggested}
+
+
+# --- experiment_plan ------------------------------------------------------------------------
+def stage_experiment_plan(project: Project, payload: dict[str, Any], task: str | None = None) -> dict[str, Any]:
+    """experiment_planner: на каждое утверждение новизны — эксперимент, метрика, базовые линии, ключ реестра."""
+    novelty = project.artifact("novelty")
+    if novelty is None:
+        raise StageError("нет артефакта novelty")
+    parts = [project.context_header(with_registry=True), f"## Новизна\n{novelty.body}",
+             _approved(project, "literature", "Обзор литературы")]
+    hint = str(payload.get("input") or "").strip()
+    if hint:
+        parts.append(f"## Указания автора (ресурсы, данные, ограничения)\n{hint}")
+    base = "\n\n".join(p for p in parts if p)
+    final, provider = _author_critic_author(project, "experiment_planner", base, task, 5000)
+    project.write_artifact("experiment_plan", final.text, _created_by("experiment_planner", provider, final))
+    return _review_loop(project, "experiment_plan", task,
+                        _reviser(project, "experiment_plan", "experiment_planner", base, task, 5000))
 
 
 # --- draft ----------------------------------------------------------------------------------
@@ -125,10 +204,8 @@ def merge_section(body: str, section: str, text: str, order: list[str]) -> str:
 
 def _draft_context(project: Project) -> str:
     parts = [project.context_header(with_registry=True)]
-    for t in ("novelty", "literature", "experiment_plan"):
-        art = project.artifact(t)
-        if art and art.status == "approved":
-            parts.append(f"## Одобренный артефакт «{t}»\n{art.body}")
+    parts += [sec for t in ("novelty", "literature", "experiment_plan")
+              if (sec := _approved(project, t, f"Одобренный артефакт «{t}»"))]
     style = project.style()
     if style["samples"]:
         parts.append("## Образцы стиля автора\n" + "\n---\n".join(style["samples"]))
@@ -195,8 +272,11 @@ def stage_assembly(project: Project, payload: dict[str, Any], task: str | None =
     outputs = ["paper.md"]
     if shutil.which("pandoc"):
         out = project.path / "paper.docx"
-        proc = subprocess.run(["pandoc", str(project.path / "paper.md"), "-o", str(out)], check=False,
-                              capture_output=True, text=True)
+        cmd = ["pandoc", str(project.path / "paper.md"), "-o", str(out)]
+        bib = project.ws.root / "library" / "refs.bib"
+        if bib.exists():  # ссылки [@ключ] → список литературы
+            cmd += ["--citeproc", "--bibliography", str(bib)]
+        proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
         if proc.returncode == 0:
             outputs.append(out.name)
         else:
@@ -204,8 +284,9 @@ def stage_assembly(project: Project, payload: dict[str, Any], task: str | None =
     return {"accepted": True, "outputs": outputs, "version": art.version}
 
 
-STAGES = {"novelty": stage_novelty, "draft": stage_draft, "review": stage_review, "assembly": stage_assembly}
-NOT_YET = {"literature": "v0.3", "experiment_plan": "v0.3", "experiments": "v0.4"}
+STAGES = {"novelty": stage_novelty, "literature": stage_literature, "experiment_plan": stage_experiment_plan,
+          "draft": stage_draft, "review": stage_review, "assembly": stage_assembly}
+NOT_YET = {"experiments": "v0.4"}
 
 
 def run_stage(project: Project, stage: str, payload: dict[str, Any], task: str | None = None) -> dict[str, Any]:

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Библиотека{% endblock %}
+{% block content %}
+<h1>Библиотека</h1>
+<p class="muted">{{ bib }} — единственный источник ключей цитирования: в артефактах допустимы только <code>[@ключ]</code> из него.
+  Текст PDF извлекается pdftotext и индексируется FTS5.</p>
+
+<form method="post" action="/library/import" enctype="multipart/form-data">
+  <input type="file" name="files" multiple accept=".bib,.pdf">
+  или путь к файлу/папке на сервере <input name="path" size="40" placeholder="/home/me/papers">
+  <button>импортировать</button>
+</form>
+<form method="get" action="/library" style="margin-top:.6rem">
+  поиск по библиотеке <input name="q" value="{{ q }}" size="40" placeholder="слова через пробел"> <button>найти</button>
+</form>
+<form method="post" action="/library/openalex" style="margin-top:.6rem">
+  поиск в OpenAlex <input name="q" size="40" placeholder="название или тема"> <button>искать</button>
+  <span class="muted">находки появятся ниже как предложения</span>
+</form>
+
+{% if q %}
+<h2>Найдено по «{{ q }}»</h2>
+<table>
+  <tr><th>ключ</th><th>работа</th><th>фрагмент</th></tr>
+  {% for h in hits %}
+  <tr><td><code>[@{{ h.key }}]</code></td><td>{{ h.title }} <span class="muted">({{ h.year }}; {{ h.authors }})</span></td>
+      <td class="muted">{{ h.snippet }}</td></tr>
+  {% else %}<tr><td colspan="3" class="muted">Ничего.</td></tr>{% endfor %}
+</table>
+{% endif %}
+
+{% if suggestions %}
+<h2>Предложения OpenAlex — ждут решения автора</h2>
+<table>
+  <tr><th>запрос</th><th>работа</th><th>DOI</th><th>проект</th><th></th></tr>
+  {% for s in suggestions %}
+  <tr><td class="muted">{{ s.query }}</td><td>{{ s.title }} <span class="muted">({{ s.year }}; {{ s.authors|truncate(80) }}; {{ s.venue }})</span></td>
+      <td class="muted">{{ s.doi }}</td><td class="muted">{{ s.project or '' }}</td>
+      <td style="white-space:nowrap">
+        <form method="post" action="/library/suggestions/{{ s.id }}/accept" style="display:inline"><button>добавить</button></form>
+        <form method="post" action="/library/suggestions/{{ s.id }}/reject" style="display:inline"><button>отклонить</button></form>
+      </td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<h2>Записи ({{ records|length }})</h2>
+<table>
+  <tr><th>ключ</th><th>тип</th><th>работа</th><th>DOI</th><th>PDF</th><th>добавлено</th><th></th></tr>
+  {% for r in records %}
+  <tr><td><code>{{ r.key }}</code></td><td class="muted">{{ r.type }}</td>
+      <td>{{ r.title }} <span class="muted">({{ r.year }}; {{ (r.authors or '')|truncate(80) }})</span>
+        {% if r.type == 'misc' and not r.authors %} <span class="bad">без метаданных</span>{% endif %}</td>
+      <td class="muted">{{ r.doi or '' }}</td>
+      <td>{% if r.pdf %}{{ r.pdf }}{% if not r.has_text %} <span class="bad">без текста</span>{% endif %}{% endif %}</td>
+      <td class="muted">{{ r.added_at }}</td>
+      <td><form method="post" action="/library/remove/{{ r.key }}" onsubmit="return confirm('Убрать {{ r.key }} из refs.bib?')"><button>убрать</button></form></td></tr>
+  {% else %}<tr><td colspan="7" class="muted">Пусто. Импортируйте .bib или PDF.</td></tr>{% endfor %}
+</table>
+<form method="post" action="/library/reindex"><button>пересобрать индекс</button>
+  <span class="muted">после ручной правки refs.bib или папки pdf/</span></form>
+{% endblock %}

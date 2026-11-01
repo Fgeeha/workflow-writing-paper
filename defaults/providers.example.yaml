@@ -127,6 +127,10 @@ providers:
     ca_bundle: ""          # путь к корневому сертификату, если системного нет
     enabled: false
 
+library:                     # библиотека workspace/library: refs.bib, pdf/, index.sqlite (FTS5)
+  openalex: true             # поиск недостающих работ в OpenAlex; находки ждут подтверждения автора
+  mailto: ""                 # e-mail для «вежливого пула» OpenAlex (быстрее и стабильнее), необязательно
+
 roles:                       # назначение по умолчанию; проект может переопределить
   ideator: codex
   critic: ollama-gemma4-12b

@@ -10,6 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
+      - run: sudo apt-get install -y --no-install-recommends poppler-utils  # pdftotext для тестов PDF
       - run: uv sync
       - run: uv run ruff check .
       - run: uv run pytest -q

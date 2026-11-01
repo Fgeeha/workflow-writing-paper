@@ -3,7 +3,7 @@
 {% block content %}
 <h1>{{ project.slug }}{% if project.manifest.title %} — {{ project.manifest.title }}{% endif %}</h1>
 <p class="muted">{{ project.path }} · шаблон {{ project.manifest.template }} · журнал {{ project.manifest.journal }} · язык {{ project.language }}
-  · <a href="/projects/{{ project.slug }}/registry">реестр результатов</a></p>
+  · <a href="/projects/{{ project.slug }}/registry">реестр результатов</a> · <a href="/library">библиотека</a></p>
 <p>Бюджет: токены {{ spent.tokens|int }} / {{ budget.tokens }}, ${{ '%.3f'|format(spent.usd) }} / {{ budget.usd }}</p>
 
 <h2>Стадии</h2>
@@ -22,6 +22,11 @@
         <form method="post" action="/projects/{{ project.slug }}/run/novelty">
           <textarea name="input" rows="3" cols="60" placeholder="Абзац новизны от автора (пусто — переработать текущую версию)"></textarea>
           <button>запустить</button></form>
+      {% elif s.id in ('literature', 'experiment_plan') %}
+        <form method="post" action="/projects/{{ project.slug }}/run/{{ s.id }}">
+          <textarea name="input" rows="2" cols="60" placeholder="{{ 'Указания автору обзора: ключевые слова, что искать (необязательно)' if s.id == 'literature' else 'Ресурсы, данные, ограничения для планировщика (необязательно)' }}"></textarea>
+          <button>запустить</button></form>
+        {% if not s.required and not s.skipped %}<form method="post" action="/projects/{{ project.slug }}/skip/{{ s.id }}" style="display:inline"><input name="reason" placeholder="причина" size="12"><button>пропустить</button></form>{% endif %}
       {% elif s.id == 'draft' %}
         <form method="post" action="/projects/{{ project.slug }}/run/draft">
           <select name="section">{% for sec in sections %}<option value="{{ sec.name }}">{{ sec.name }}{% if sec.written %} ✓{% endif %}</option>{% endfor %}</select>
