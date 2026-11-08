@@ -1,10 +1,11 @@
-"""Маршруты v0.2: главная, проекты, проект, артефакт, реестр результатов, настройки."""
+"""Маршруты: главная, проекты, проект, артефакт, реестр результатов и сценарии экспериментов, настройки."""
 
 from __future__ import annotations
 
 import difflib
 import json
 from collections.abc import Callable
+from html import escape
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,7 @@ from ..core import Artifact, Project, Workspace
 from ..core.engine import enqueue
 from ..core.project import STAGE_ARTIFACT
 from ..core.workspace import DEFAULTS
+from ..experiments import CONFLICT_PREFIX
 from ..library import Library
 from ..registry import add_manual
 from ..roles import NOT_YET
@@ -208,8 +210,55 @@ def register(app: FastAPI, ws: Workspace, render: Render) -> None:
     @app.get("/projects/{slug}/registry")
     def registry_page(slug: str, request: Request) -> HTMLResponse:
         project = _open(ws, slug)
-        return render(request, "registry.html", project=project, data=project.registry_data(),
-                      scenarios=project.manifest.get("scenarios") or [])
+        runs_dir = project.path / "runs"
+        runs = sorted((p.name for p in runs_dir.iterdir() if p.is_dir()), reverse=True)[:20] if runs_dir.exists() else []
+        db = ws.db()
+        conflicts = db.execute("SELECT * FROM tasks WHERE project = ? AND stage = 'experiments' AND status = 'failed' "
+                               "AND error LIKE ? ORDER BY id DESC LIMIT 5", (slug, f"{CONFLICT_PREFIX}%")).fetchall()
+        db.close()
+        return render(request, "registry.html", project=project, data=project.registry_data(), runs=runs,
+                      scenarios=project.manifest.get("scenarios") or [], conflicts=conflicts,
+                      can_run=project.can_run("experiments")[0])
+
+    @app.post("/projects/{slug}/scenarios")
+    async def scenario_add(slug: str, request: Request) -> RedirectResponse:
+        """Регистрация сценария человеком: YAML одного сценария дописывается в манифест."""
+        text = str((await request.form()).get("yaml") or "")
+        try:
+            sc = yaml.safe_load(text)
+        except yaml.YAMLError as e:
+            raise HTTPException(400, f"YAML: {e}") from e
+        shape = {"id": str, "command": list, "results": list, "mapping": dict}
+        if not isinstance(sc, dict) or any(not isinstance(sc.get(k), t) for k, t in shape.items()):
+            raise HTTPException(400, "сценарий — словарь: id (строка), command и results (списки), mapping (словарь); "
+                                     "необязательно cwd, host, units, seed, timeout")
+        if sc.get("host", "local") != "local" and not str(sc.get("host", "")).startswith("ssh:"):
+            raise HTTPException(400, "host: local или ssh:<alias>")
+        project = _open(ws, slug)
+        items = project.manifest.setdefault("scenarios", [])
+        if any(s.get("id") == sc["id"] for s in items):
+            raise HTTPException(400, f"сценарий {sc['id']} уже есть")
+        items.append(sc)
+        project.save_manifest()
+        return RedirectResponse(f"/projects/{slug}/registry", status_code=303)
+
+    @app.post("/projects/{slug}/scenarios/{sid}/run")
+    async def scenario_run(slug: str, sid: str, request: Request) -> RedirectResponse:
+        force = bool((await request.form()).get("force"))
+        try:
+            enqueue(ws, slug, "experiments", {"scenario": sid, "force": force})
+        except (ValueError, FileNotFoundError) as e:
+            raise HTTPException(400, str(e)) from e
+        return RedirectResponse(f"/projects/{slug}/registry", status_code=303)
+
+    @app.get("/projects/{slug}/runs/{run}/{name}", response_class=HTMLResponse)
+    def run_file(slug: str, run: str, name: str) -> str:
+        if name not in ("stdout.txt", "stderr.txt", "run.json") or "/" in run or ".." in run:
+            raise HTTPException(400)
+        p = _open(ws, slug).path / "runs" / run / name
+        if not p.exists():
+            raise HTTPException(404)
+        return f"<pre>{escape(p.read_text(encoding='utf-8'))}</pre>"
 
     @app.post("/projects/{slug}/registry")
     async def registry_add(slug: str, request: Request) -> RedirectResponse:

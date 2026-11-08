@@ -1,6 +1,6 @@
 [project]
 name = "workflow-writing-paper"
-version = "0.3.0"
+version = "0.4.0"
 description = "Конвейер написания научных статей с пулом языковых моделей"
 readme = "README.md"
 license = "MIT"

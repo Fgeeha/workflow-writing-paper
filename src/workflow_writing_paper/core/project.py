@@ -179,8 +179,9 @@ class Project:
             return "pending"
         if st.get("skipped"):
             return "skipped"
-        if stage_id == "experiments":
-            return "done" if self.registry_data() else "pending"
+        if stage_id == "experiments":  # done — есть хотя бы одно число из сценария (не ручной ввод)
+            return "done" if any(v.get("source") != "manual" for v in self.registry_data().values()
+                                 if isinstance(v, dict)) else "pending"
         art = self.artifact(STAGE_ARTIFACT.get(stage_id, stage_id))
         if art is None:
             return "pending"

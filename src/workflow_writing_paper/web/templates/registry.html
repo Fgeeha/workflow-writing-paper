@@ -3,13 +3,18 @@
 {% block content %}
 <p><a href="/projects/{{ project.slug }}">← {{ project.slug }}</a></p>
 <h1>Реестр результатов</h1>
-<p class="muted">Единственный источник чисел для текста статьи. Пишут сюда парсер сценариев (v0.4) и эта форма.</p>
+<p class="muted">Единственный источник чисел для текста статьи. Пишут сюда парсер сценариев и эта форма.</p>
+{% for c in conflicts %}
+<p class="rec" style="border-color:#b3261e;background:#f8e8e6">Задача #{{ c.id }}: {{ c.error }}</p>
+{% endfor %}
 <table>
-  <tr><th>ключ</th><th>значение</th><th>ед.</th><th>источник</th><th>когда</th><th>примечание</th></tr>
+  <tr><th>ключ</th><th>значение</th><th>ед.</th><th>источник</th><th>когда</th><th>seed · команда · git</th><th>примечание</th></tr>
   {% for k, v in data.items() %}
   <tr><td><code>{{ k }}</code></td><td class="num">{{ v.value }}</td><td>{{ v.unit }}</td><td>{{ v.source }}</td>
-      <td class="muted">{{ v.run }}</td><td class="muted">{{ v.note }}</td></tr>
-  {% else %}<tr><td colspan="6" class="muted">Пусто.</td></tr>{% endfor %}
+      <td class="muted">{{ v.run }}</td>
+      <td class="muted">{% if v.source != 'manual' %}{{ v.seed if v.seed is not none else '—' }} · {{ v.command_hash }} · {{ v.git_rev or '—' }}{% endif %}</td>
+      <td class="muted">{{ v.note }}</td></tr>
+  {% else %}<tr><td colspan="7" class="muted">Пусто.</td></tr>{% endfor %}
 </table>
 <h2>Ручной ввод</h2>
 <form method="post" action="/projects/{{ project.slug }}/registry">
@@ -19,5 +24,37 @@
   примечание <input name="note" size="30">
   <button>записать</button>
 </form>
-{% if scenarios %}<h2>Сценарии экспериментов</h2><pre>{{ scenarios }}</pre>{% endif %}
+<h2>Сценарии экспериментов</h2>
+<table>
+  <tr><th>id</th><th>host</th><th>cwd</th><th>команда</th><th>результаты → ключи</th><th>действие</th></tr>
+  {% for s in scenarios %}
+  <tr><td><code>{{ s.id }}</code></td><td>{{ s.host or 'local' }}</td><td class="muted">{{ s.cwd or '.' }}</td>
+      <td><code>{{ s.command|join(' ') }}</code></td>
+      <td class="muted">{{ s.results|join(', ') }} → {{ s.mapping.values()|join(', ') }}</td>
+      <td style="white-space:nowrap">
+        {% if can_run %}
+        <form method="post" action="/projects/{{ project.slug }}/scenarios/{{ s.id }}/run" style="display:inline"><button>запустить</button></form>
+        <form method="post" action="/projects/{{ project.slug }}/scenarios/{{ s.id }}/run" style="display:inline"><input type="hidden" name="force" value="1"><button title="перезаписать расходящиеся значения">запустить с перезаписью</button></form>
+        {% else %}<span class="muted">стадия experiments пока недоступна (гейт)</span>{% endif %}
+      </td></tr>
+  {% else %}<tr><td colspan="6" class="muted">Сценариев нет.</td></tr>{% endfor %}
+</table>
+<details><summary>Зарегистрировать сценарий (YAML)</summary>
+<form method="post" action="/projects/{{ project.slug }}/scenarios">
+<textarea name="yaml" rows="9" cols="80">id: bench-c6
+cwd: .                      # относительно проекта; для ssh — путь на удалённой машине
+host: local                 # local | ssh:&lt;alias из ~/.ssh/config&gt;
+command: [python, run_bench.py, --config, c6.yaml]
+results: [out/metrics.json]  # .json или .csv
+mapping:                    # $.путь (JSON) или столбец@строка (CSV) → ключ реестра
+  "$.latency_ms.p50": latency_p50_ms
+units: {latency_p50_ms: ms}
+seed: 42</textarea><br><button>добавить в манифест</button></form></details>
+{% if runs %}
+<h2>Запуски</h2>
+<ul>{% for r in runs %}<li><code>{{ r }}</code> ·
+  <a href="/projects/{{ project.slug }}/runs/{{ r }}/stdout.txt">stdout</a> ·
+  <a href="/projects/{{ project.slug }}/runs/{{ r }}/stderr.txt">stderr</a> ·
+  <a href="/projects/{{ project.slug }}/runs/{{ r }}/run.json">run.json</a></li>{% endfor %}</ul>
+{% endif %}
 {% endblock %}

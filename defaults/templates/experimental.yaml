@@ -3,7 +3,7 @@ stages:
   - {id: novelty,         required: true}
   - {id: literature,      required: false}   # обзор по библиотеке; можно пропустить с причиной
   - {id: experiment_plan, required: false}
-  - {id: experiments,     required: false}   # v0.4; числа можно вносить в реестр вручную
+  - {id: experiments,     required: false}   # сценарии манифеста → реестр; числа можно вносить и вручную
   - {id: draft,           required: true}
   - {id: review,          required: true}
   - {id: assembly,        required: true}

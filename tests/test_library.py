@@ -296,7 +296,7 @@ def test_web_library_page(tmp_path):
     assert client.get("/settings/edit?rel=library/refs.bib").status_code == 200
     client.post("/projects", data={"slug": "p1", "template": "experimental", "journal": "generic", "language": "ru"})
     page = client.get("/projects/p1").text
-    assert "появится в v0.4" in page and "появится в v0.3" not in page and "/run/literature" not in page  # гейт
+    assert "появится в" not in page and "/run/literature" not in page  # все стадии реализованы; гейт держит literature
     p1 = Project.open(ws, "p1")
     p1.write_artifact("novelty", NOVELTY_OK, {"role": "ideator", "provider": "writer", "family": "a"})
     p1.decide("novelty", "approve")

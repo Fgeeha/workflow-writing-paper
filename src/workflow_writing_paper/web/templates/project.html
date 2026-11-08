@@ -27,6 +27,9 @@
           <textarea name="input" rows="2" cols="60" placeholder="{{ 'Указания автору обзора: ключевые слова, что искать (необязательно)' if s.id == 'literature' else 'Ресурсы, данные, ограничения для планировщика (необязательно)' }}"></textarea>
           <button>запустить</button></form>
         {% if not s.required and not s.skipped %}<form method="post" action="/projects/{{ project.slug }}/skip/{{ s.id }}" style="display:inline"><input name="reason" placeholder="причина" size="12"><button>пропустить</button></form>{% endif %}
+      {% elif s.id == 'experiments' %}
+        <a href="/projects/{{ project.slug }}/registry">сценарии и запуск — в реестре</a>
+        {% if not s.required and not s.skipped %}<form method="post" action="/projects/{{ project.slug }}/skip/{{ s.id }}" style="display:inline"><input name="reason" placeholder="причина" size="12"><button>пропустить</button></form>{% endif %}
       {% elif s.id == 'draft' %}
         <form method="post" action="/projects/{{ project.slug }}/run/draft">
           <select name="section">{% for sec in sections %}<option value="{{ sec.name }}">{{ sec.name }}{% if sec.written %} ✓{% endif %}</option>{% endfor %}</select>

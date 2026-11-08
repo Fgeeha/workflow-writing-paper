@@ -71,11 +71,19 @@ def cmd_run(ws: Workspace, args: argparse.Namespace) -> int:
         payload["input"] = args.input
     if args.section:
         payload["section"] = args.section
+    if args.scenario:
+        payload["scenario"] = args.scenario
+    if args.force:
+        payload["force"] = "1"
     tid = enqueue(ws, args.slug, args.stage, payload)
     res = run_task(ws, tid)
     if res["error"]:
         print(f"задача {tid}: ошибка: {res['error']}", file=sys.stderr)
         return 1
+    if args.stage == "experiments":
+        print(f"задача {tid}: сценарий {res['scenario']} → реестр: "
+              + ", ".join(f"{k}={res['values'][k]:g}" for k in res["written"]) + f"; журнал runs/{res['run_dir']}")
+        return 0
     print(f"задача {tid}: готово; принято судьями: {res.get('accepted')}; блокеров: {len(res.get('blockers', []))}")
     for b in res.get("blockers", []):
         print(f"  - [{b.get('judge')}] строка {b.get('line', '?')}: {b.get('issue')}")
@@ -161,6 +169,8 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("stage")
     run.add_argument("--input", help="абзац новизны для стадии novelty")
     run.add_argument("--section", help="раздел для стадии draft")
+    run.add_argument("--scenario", help="id сценария для стадии experiments (если в манифесте не один)")
+    run.add_argument("--force", action="store_true", help="experiments: перезаписать расходящиеся значения реестра")
     review = sub.add_parser("review", help="перепроверить артефакт судьями без перегенерации")
     review.add_argument("slug")
     review.add_argument("artifact", nargs="?", default="draft")

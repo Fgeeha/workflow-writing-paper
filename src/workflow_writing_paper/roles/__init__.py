@@ -1,4 +1,4 @@
-"""Роли: сборка контекста кодом, вызов назначенной модели, стадии novelty / literature / experiment_plan / draft / review / assembly."""
+"""Роли: сборка контекста кодом, вызов назначенной модели, все стадии конвейера (experiments — без модели)."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from collections.abc import Callable
 from typing import Any
 
 from ..core.project import Project
+from ..experiments import ExperimentError, run_scenario
 from ..library import Library
 from ..providers import Completion, Provider, ProviderError, build_pool, call_logged
 from ..review import ReviewError, review_artifact
@@ -248,6 +249,16 @@ def stage_draft(project: Project, payload: dict[str, Any], task: str | None = No
     return _review_loop(project, "draft", task, revise)
 
 
+# --- experiments ----------------------------------------------------------------------------
+def stage_experiments(project: Project, payload: dict[str, Any], task: str | None = None) -> dict[str, Any]:
+    """Без модели: запуск сценария манифеста и запись чисел в реестр; конфликт — остановка с вопросом автору."""
+    try:
+        res = run_scenario(project, str(payload.get("scenario") or ""), force=bool(payload.get("force")))
+    except ExperimentError as e:
+        raise StageError(str(e)) from e
+    return {"accepted": True, "blockers": [], **res}
+
+
 # --- review, assembly ----------------------------------------------------------------------
 def stage_review(project: Project, payload: dict[str, Any], task: str | None = None) -> dict[str, Any]:
     """Проверка целиком: по умолчанию draft; payload.artifact — перепроверить любой артефакт без перегенерации."""
@@ -285,8 +296,8 @@ def stage_assembly(project: Project, payload: dict[str, Any], task: str | None =
 
 
 STAGES = {"novelty": stage_novelty, "literature": stage_literature, "experiment_plan": stage_experiment_plan,
-          "draft": stage_draft, "review": stage_review, "assembly": stage_assembly}
-NOT_YET = {"experiments": "v0.4"}
+          "experiments": stage_experiments, "draft": stage_draft, "review": stage_review, "assembly": stage_assembly}
+NOT_YET: dict[str, str] = {}  # стадии, ещё не реализованные: id → версия
 
 
 def run_stage(project: Project, stage: str, payload: dict[str, Any], task: str | None = None) -> dict[str, Any]:
