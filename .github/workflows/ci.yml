@@ -10,7 +10,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends poppler-utils  # pdftotext для тестов PDF
+      # pdftotext для тестов PDF; без него тест PDF пропускается, поэтому сбой зеркал apt не роняет CI
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends poppler-utils
+        continue-on-error: true
       - run: uv sync
       - run: uv run ruff check .
       - run: uv run mypy src
