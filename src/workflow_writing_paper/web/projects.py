@@ -129,7 +129,8 @@ def register(app: FastAPI, ws: Workspace, render: Render) -> None:
         written = draft.body if draft else ""
         sections = [{"name": s, "written": f"## {s}" in written} for s in project.sections()]
         return render(request, "project.html", project=project, stages=stages, tasks=tasks, sections=sections,
-                      spent=project.spent(), budget=project.manifest.get("budget") or {})
+                      spent=project.spent(), budget=project.manifest.get("budget") or {},
+                      providers=sorted(p["id"] for p in project.ws.config().get("providers") or []))
 
     @app.post("/projects/{slug}/run/{stage}")
     async def run_stage_route(slug: str, stage: str, request: Request) -> RedirectResponse:
@@ -177,6 +178,17 @@ def register(app: FastAPI, ws: Workspace, render: Render) -> None:
         try:
             _open(ws, slug).decide(type_, decision, reason)
         except (ValueError, FileNotFoundError) as e:
+            raise HTTPException(400, str(e)) from e
+        return RedirectResponse(f"/projects/{slug}/artifacts/{type_}", status_code=303)
+
+    @app.post("/projects/{slug}/artifacts/{type_}/ab/{chosen}")
+    def ab_choose(slug: str, type_: str, chosen: str) -> RedirectResponse:
+        """Выбор автора в живом A/B: версия a или b становится текущей."""
+        from ..roles.ab import choose
+
+        try:
+            choose(_open(ws, slug), type_, chosen)
+        except ValueError as e:
             raise HTTPException(400, str(e)) from e
         return RedirectResponse(f"/projects/{slug}/artifacts/{type_}", status_code=303)
 

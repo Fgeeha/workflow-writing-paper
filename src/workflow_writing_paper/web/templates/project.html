@@ -25,11 +25,11 @@
       {% elif s.id == 'novelty' %}
         <form method="post" action="/projects/{{ project.slug }}/run/novelty">
           <textarea name="input" rows="3" cols="60" placeholder="{{ 'Абзац новизны от автора (пусто — вывести из обзора по теме корпуса)' if project.manifest.library == 'project' else 'Абзац новизны от автора (пусто — переработать текущую версию)' }}"></textarea>
-          <button>запустить</button></form>
+          {% include "ab_select.html" %}<button>запустить</button></form>
       {% elif s.id in ('literature', 'experiment_plan') %}
         <form method="post" action="/projects/{{ project.slug }}/run/{{ s.id }}">
           <textarea name="input" rows="2" cols="60" placeholder="{{ 'Указания автору обзора: ключевые слова, что искать (необязательно)' if s.id == 'literature' else 'Ресурсы, данные, ограничения для планировщика (необязательно)' }}"></textarea>
-          <button>запустить</button></form>
+          {% include "ab_select.html" %}<button>запустить</button></form>
         {% if not s.required and not s.skipped %}<form method="post" action="/projects/{{ project.slug }}/skip/{{ s.id }}" style="display:inline"><input name="reason" placeholder="причина" size="12"><button>пропустить</button></form>{% endif %}
       {% elif s.id == 'experiments' %}
         <a href="/projects/{{ project.slug }}/registry">сценарии и запуск — в реестре</a>
@@ -37,7 +37,7 @@
       {% elif s.id == 'draft' %}
         <form method="post" action="/projects/{{ project.slug }}/run/draft">
           <select name="section">{% for sec in sections %}<option value="{{ sec.name }}">{{ sec.name }}{% if sec.written %} ✓{% endif %}</option>{% endfor %}</select>
-          <button>написать раздел</button></form>
+          {% include "ab_select.html" %}<button>написать раздел</button></form>
       {% else %}
         <form method="post" action="/projects/{{ project.slug }}/run/{{ s.id }}" style="display:inline"><button>запустить</button></form>
         {% if not s.required and not s.skipped %}<form method="post" action="/projects/{{ project.slug }}/skip/{{ s.id }}" style="display:inline"><input name="reason" placeholder="причина" size="12"><button>пропустить</button></form>{% endif %}

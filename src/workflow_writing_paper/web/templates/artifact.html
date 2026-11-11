@@ -17,6 +17,12 @@
 </form>
 {% if art.type != 'corpus' %}<form method="post" action="/projects/{{ project.slug }}/artifacts/{{ art.type }}/review"><button>перепроверить судьями</button></form>{% endif %}
 {% endif %}
+{% if art.meta.ab and art.version == current.version %}
+<form method="post" class="rec">A/B ({{ art.meta.ab.role }}): <a href="?version={{ art.meta.ab.a.version }}">v{{ art.meta.ab.a.version }} — {{ art.meta.ab.a.provider }}</a>
+  против <a href="?version={{ art.meta.ab.b.version }}">v{{ art.meta.ab.b.version }} — {{ art.meta.ab.b.provider }}</a>.
+  <button formaction="/projects/{{ project.slug }}/artifacts/{{ art.type }}/ab/a">выбрать A</button>
+  <button formaction="/projects/{{ project.slug }}/artifacts/{{ art.type }}/ab/b">выбрать B</button></form>
+{% endif %}
 {% if art.type == 'corpus' %}
 <h2>Корпус: {{ (art.meta.works or [])|length }} работ</h2>
 <p class="muted">Одобрите корпус целиком или вычеркните лишнее. Работы пришли из OpenAlex; оценка релевантности — модели по аннотации.</p>

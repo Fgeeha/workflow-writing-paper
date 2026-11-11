@@ -247,7 +247,8 @@ def stage_draft(project: Project, payload: dict[str, Any], task: str | None = No
     ctx = _draft_context(project)
     prev = project.artifact("draft")
     body_prev = prev.body if prev else ""
-    ask = f"{ctx}\n\n## Уже написанные разделы\n{body_prev or '(пусто)'}\n\nНапиши раздел «{section}»."
+    seen = str(payload.get("_draft_base", body_prev))  # A/B: модель B видит черновик до прогона A
+    ask = f"{ctx}\n\n## Уже написанные разделы\n{seen or '(пусто)'}\n\nНапиши раздел «{section}»."
     comp, provider = call_role(project, "section_writer", ask, task, 6000)
     text = _edit(project, ctx, comp.text, task)
     project.write_artifact("draft", merge_section(body_prev, section, text, sections),
@@ -340,6 +341,10 @@ def run_stage(project: Project, stage: str, payload: dict[str, Any], task: str |
         raise StageError(f"стадия {stage} появится в {NOT_YET[stage]}; пока её можно пропустить с указанием причины")
     if stage not in STAGES:
         raise StageError(f"неизвестная стадия {stage}")
+    if payload.get("ab"):  # живое A/B: та же стадия второй моделью, выбор за автором
+        from .ab import stage_ab
+
+        return stage_ab(project, stage, str(payload["ab"]), {k: v for k, v in payload.items() if k != "ab"}, task)
     return STAGES[stage](project, payload, task)
 
 

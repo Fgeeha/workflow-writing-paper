@@ -1,6 +1,6 @@
 # План: конвейер написания научных статей с пулом языковых моделей
 
-Версия плана: 2026-11-11. Техническое задание на v0.1–v0.5; v0.1–v0.5 выполнены.
+Версия плана: 2026-11-11. Техническое задание на v0.1–v0.6; v0.1–v0.5 выполнены, v0.6 в работе.
 
 ## 1. Назначение и границы
 
@@ -79,7 +79,7 @@
 │                                                                                           │
 │  web/            FastAPI + Jinja2 + HTMX: проекты, артефакты, гейты, пул, стенд, журнал   │
 │      │                                                                                    │
-│  core/engine     граф стадий, очередь задач (SQLite), фоновый воркер (asyncio)            │
+│  core/engine     граф стадий, очередь задач (SQLite), фоновый воркер (потоки)            │
 │      │                                                                                    │
 │  ┌───┴──────────┬──────────────┬──────────────┬──────────────┬──────────────┐             │
 │  roles/        review/        eval/          library/       experiments/   registry/      │
@@ -111,7 +111,9 @@ class Provider(Protocol):
 
 Параллелизм: вызовы к GPU-провайдерам (`gpu: true`) выполняются строго по одному, облачные —
 до `max_parallel` из конфигурации. Два GPU-провайдера, несовместимых по памяти, объявляются
-в одной группе `exclusive_group`, и воркер не запускает их одновременно.
+в одной группе `exclusive_group`, и воркер не запускает их одновременно. Воркер ведёт задачи разных проектов
+параллельно (`worker: {parallel: 2}` в `providers.yaml`), у одного проекта — одна задача за раз; судьи одной
+проверки опрашиваются одновременно, GPU-модели среди них всё равно идут по одной.
 
 ## 5. Каталоги
 
@@ -416,7 +418,9 @@ numbers: {decimal_separator: ",", rounding: 2}
 - прогон `wwp bench --role critic --providers a,b,c` или из интерфейса: каждая модель решает
   каждую задачу, ответы оценивают два судьи других семейств по рубрике роли, автор ставит
   оценку 1–5;
-- живые A/B: при создании артефакта можно запросить две модели; выбор автора записывается;
+- живые A/B: при запуске стадии `novelty`, `literature`, `experiment_plan` или `draft` можно указать модель B —
+  стадия выполняется дважды (моделью роли и моделью B) с полной проверкой судьями, обе версии остаются в истории;
+  автор выбирает, выбор пишется в `ab_choices` и в заголовок артефакта (`ab_chosen`);
 - итог — таблица роль × модель: медиана оценки судей, медиана оценки автора, доля побед в A/B,
   медианное время, стоимость на задачу. Рекомендация — лучшая по оценке автора, при равенстве —
   по стоимости. Назначение на роль остаётся за человеком.
@@ -488,7 +492,8 @@ wwp init [--workspace PATH]           создать workspace из defaults
 wwp serve [--host 127.0.0.1 --port 8765]
 wwp new <slug> --template experimental [--path /external/dir]
 wwp run <slug> <stage> [--scenario ID] [--force]   выполнить стадию; experiments — сценарий → реестр
-wwp decide <slug> <artifact> approve|override|return|reject [--reason …]   решение автора без веба
+wwp run <slug> <stage> --ab <provider>  живое A/B: стадия моделью роли и моделью B, выбор за автором
+wwp decide <slug> <artifact> approve|override|return|reject|a|b [--reason …]   решение автора без веба
 wwp bench --role <role> [--providers a,b]
 wwp check <slug>                      только детерминированные проверки
 wwp lib import <files...>             импорт .bib и .pdf в библиотеку
@@ -506,11 +511,11 @@ wwp gc [--older-than 90d] [--apply]   старые вызовы и неодоб�
 - `tasks(id, project, stage, role, status, payload, created_at, started_at, finished_at, error)`;
 - `calls(id, project, task, role, provider, family, prompt_path, tokens_in, tokens_out, duration_ms, cost_usd, created_at)`;
 - `approvals(id, project, artifact, version, decision, override_reason, created_at)`;
-- `ab_choices(id, project, artifact, provider_a, provider_b, chosen, created_at)`;
+- `ab_choices(id, project, artifact, role, provider_a, provider_b, chosen, created_at)`;
 - `bench_runs(id, role, task, provider, judge_scores, human_score, duration_ms, cost_usd, created_at)`.
 
 Файлы остаются первичны: `wwp reindex` восстанавливает из содержимого `workspace/` и проектов таблицы
-`projects`, `calls` и `approvals` (решения «одобрить», «override», «отклонить» — из заголовков версий).
+`projects`, `calls`, `approvals` (решения «одобрить», «override», «отклонить») и `ab_choices` — из заголовков версий.
 Очередь `tasks`, решения «вернуть на правку», повторные решения по той же версии и оценки `bench_runs`
 живут только в базе.
 
@@ -562,9 +567,14 @@ wwp gc [--older-than 90d] [--apply]   старые вызовы и неодоб�
 - Не сделано, ждёт данных автора: импорт его библиотеки, сценарий по ssh на его машине, прогон стенда на
   новых ролях.
 
-После v0.5 (v0.6): живые A/B, параллельный воркер, docker-compose; открытие репозитория, перенос профилей
-журналов и эталонных задач автора в его `workspace/`, перевод стенда рецензирования рукописей на общий модуль
-провайдеров.
+### v0.6 — стенд и переносимость
+
+- Живые A/B (§9): `--ab <provider>` и выбор в интерфейсе или `wwp decide … a|b`; доля побед в таблице стенда.
+- Параллелизм: воркер ведёт проекты параллельно, у проекта одна задача за раз, захват задачи атомарный;
+  судьи одной проверки опрашиваются одновременно.
+- `Dockerfile` и `docker-compose.yml` (сервер на 127.0.0.1 хоста), `journals/example.yaml` с описанием полей.
+- Решения автора, не делаются без него: открытие репозитория, перенос профилей журналов и эталонов автора в
+  его `workspace/`, перевод стенда рецензирования рукописей на общий модуль провайдеров, `i18n/en.yaml`.
 
 ## 16. Тестирование
 

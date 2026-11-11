@@ -29,6 +29,10 @@ CREATE TABLE IF NOT EXISTS approvals (
     id INTEGER PRIMARY KEY, project TEXT, artifact TEXT, version INTEGER, decision TEXT, override_reason TEXT,
     created_at TEXT DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS ab_choices (
+    id INTEGER PRIMARY KEY, project TEXT, artifact TEXT, role TEXT, provider_a TEXT, provider_b TEXT,
+    chosen TEXT, version INTEGER, created_at TEXT DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS bench_runs (
     id INTEGER PRIMARY KEY, run TEXT, role TEXT, task TEXT, provider TEXT, family TEXT,
     answer_path TEXT, judge_scores TEXT, judge_overall REAL, coverage REAL, human_score INTEGER,

@@ -143,6 +143,8 @@ class Project:
         art = self.artifact(type_)
         if art is None:
             raise FileNotFoundError(type_)
+        if decision in ("approve", "override") and art.meta.get("ab"):
+            raise ValueError("сначала выбор A/B: какая из двух версий остаётся")
         if decision in ("approve", "override"):
             art.status = "approved"
             art.meta.update(approved_by="human", approved_at=time.strftime("%Y-%m-%dT%H:%M:%S"),

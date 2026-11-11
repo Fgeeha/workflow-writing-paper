@@ -36,8 +36,8 @@ def _project(tmp_path):
 def test_reindex_restores_db_from_files(tmp_path):
     ws, _, used, _ = _project(tmp_path)
     (ws.root / "wwp.sqlite").unlink()
-    assert reindex(ws) == {"projects": 1, "calls": 2, "approvals": 2}
-    assert reindex(ws) == {"projects": 0, "calls": 0, "approvals": 0}  # повтор ничего не дублирует
+    assert reindex(ws) == {"projects": 1, "calls": 2, "approvals": 2, "ab_choices": 0}
+    assert reindex(ws) == {"projects": 0, "calls": 0, "approvals": 0, "ab_choices": 0}  # повтор ничего не дублирует
     db = ws.db()
     rows = db.execute("SELECT artifact, version, decision FROM approvals ORDER BY version").fetchall()
     call = db.execute("SELECT * FROM calls WHERE prompt_path = ?", (str(used),)).fetchone()

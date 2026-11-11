@@ -75,6 +75,8 @@ def cmd_run(ws: Workspace, args: argparse.Namespace) -> int:
         payload["scenario"] = args.scenario
     if args.force:
         payload["force"] = "1"
+    if args.ab:
+        payload["ab"] = args.ab
     tid = enqueue(ws, args.slug, args.stage, payload)
     res = run_task(ws, tid)
     if res["error"]:
@@ -89,6 +91,12 @@ def cmd_run(ws: Workspace, args: argparse.Namespace) -> int:
         print(f"задача {tid}: сценарий {res['scenario']} → реестр: "
               + ", ".join(f"{k}={res['values'][k]:g}" for k in res["written"]) + f"; журнал runs/{res['run_dir']}")
         return 0
+    if res.get("ab"):
+        ab = res["ab"]
+        print(f"задача {tid}: A/B — v{ab['a']['version']} {ab['a']['provider']} (принято судьями: {res['accepted_a']}) "
+              f"против v{ab['b']['version']} {ab['b']['provider']} (принято: {res['accepted_b']}); "
+              f"выбор: wwp decide {args.slug} {args.stage if args.stage != 'collect' else 'corpus'} a|b")
+        return 0
     print(f"задача {tid}: готово; принято судьями: {res.get('accepted')}; блокеров: {len(res.get('blockers', []))}")
     for b in res.get("blockers", []):
         print(f"  - [{b.get('judge')}] строка {b.get('line', '?')}: {b.get('issue')}")
@@ -99,6 +107,12 @@ def cmd_decide(ws: Workspace, args: argparse.Namespace) -> int:
     from .core.project import Project
 
     project = Project.open(ws, args.slug)
+    if args.decision in ("a", "b"):
+        from .roles.ab import choose
+
+        res = choose(project, args.artifact, args.decision)
+        print(f"{args.artifact}: выбрана {res['chosen']}, текущая версия v{res['version']}")
+        return 0
     if args.decision == "override" and not args.reason:
         raise ValueError("для override нужна причина (--reason)")
     art = project.decide(args.artifact, args.decision, args.reason)
@@ -225,10 +239,11 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--section", help="раздел для стадии draft")
     run.add_argument("--scenario", help="id сценария для стадии experiments (если в манифесте не один)")
     run.add_argument("--force", action="store_true", help="experiments: перезаписать расходящиеся значения реестра")
-    decide = sub.add_parser("decide", help="решение автора по артефакту: одобрить, override, вернуть, отклонить")
+    run.add_argument("--ab", metavar="PROVIDER", help="живое A/B: выполнить стадию ещё раз этой моделью, выбор за автором")
+    decide = sub.add_parser("decide", help="решение автора по артефакту: одобрить, override, вернуть, отклонить, выбор A/B")
     decide.add_argument("slug")
     decide.add_argument("artifact")
-    decide.add_argument("decision", choices=("approve", "override", "return", "reject"))
+    decide.add_argument("decision", choices=("approve", "override", "return", "reject", "a", "b"))
     decide.add_argument("--reason", help="причина (обязательна для override)")
     review = sub.add_parser("review", help="перепроверить артефакт судьями без перегенерации")
     review.add_argument("slug")

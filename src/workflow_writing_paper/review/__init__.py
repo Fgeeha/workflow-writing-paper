@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from ..core.artifact import Artifact
@@ -141,17 +142,21 @@ def review_artifact(project: Project, type_: str, task: str | None = None) -> di
     if not ok:
         raise ReviewError(f"проверка остановлена: оценка стоимости ${estimate:.3f}; {why}")
 
-    reports: dict[str, dict[str, Any]] = {}
-    succeeded = 0
-    for judge in eligible:  # отказавший судья записывается, его место занимает следующий
-        if succeeded >= n:
-            break
+    def judge_one(judge: Provider) -> dict[str, Any]:
         if isinstance(judge, DecisionProvider):
-            rep = _decision_judge(judge, project, art, rubric, weights, threshold)
-        else:
-            rep = _text_judge(judge, project, art, rubric, weights, threshold, task)
-        reports[judge.id] = {"judge": {"provider": judge.id, "family": judge.family}, **rep}
-        succeeded += rep["overall"] is not None
+            return _decision_judge(judge, project, art, rubric, weights, threshold)
+        return _text_judge(judge, project, art, rubric, weights, threshold, task)
+
+    reports: dict[str, dict[str, Any]] = {}
+    queue, succeeded = list(eligible), 0
+    # раунды: недостающие судьи параллельно; отказавший записывается, его место занимает следующий.
+    # GPU-модели всё равно идут по одной — семафор Provider._slot.
+    while queue and succeeded < n:
+        batch, queue = queue[:n - succeeded], queue[n - succeeded:]
+        with ThreadPoolExecutor(len(batch)) as pool_:
+            for judge, rep in zip(batch, pool_.map(judge_one, batch), strict=True):
+                reports[judge.id] = {"judge": {"provider": judge.id, "family": judge.family}, **rep}
+                succeeded += rep["overall"] is not None
 
     checker_blockers = deterministic_checks(project, art, rubric)
     reports["checker"] = {"judge": {"provider": "checker", "family": "code"}, "scores": {}, "overall": None,

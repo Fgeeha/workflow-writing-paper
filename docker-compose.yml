@@ -1,0 +1,10 @@
+# docker compose up --build → http://127.0.0.1:8765
+# workspace/ (ключи в .env, проекты, wwp.sqlite) остаётся на хосте; network_mode: host даёт доступ к Ollama
+# на 127.0.0.1:11434; сервер слушает только 127.0.0.1 хоста.
+services:
+  wwp:
+    build: .
+    network_mode: host
+    volumes:
+      - ./workspace:/workspace
+    restart: unless-stopped

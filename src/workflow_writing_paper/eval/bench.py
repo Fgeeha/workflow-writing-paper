@@ -194,12 +194,18 @@ def summary(db: Any, role: str, run: str | None = None) -> tuple[list[dict[str, 
     by: dict[str, list[Any]] = {}
     for r in db.execute(sql, args).fetchall():
         by.setdefault(r["provider"], []).append(r)
-    table = []
+    table: list[dict[str, Any]] = []
+    from ..roles.ab import wins
+
+    ab = wins(db, role)
+    for pid in ab:
+        by.setdefault(pid, [])
     for pid, rs in sorted(by.items()):
         ok = [r for r in rs if r["answer_path"] and not r["error"]]  # ошибка вызова, языка или нехватки судей
         cov = [r["coverage"] for r in ok if r["coverage"] is not None]
         table.append({
-            "provider": pid, "family": rs[0]["family"], "n": len(ok), "errors": len(rs) - len(ok),
+            "provider": pid, "family": rs[0]["family"] if rs else "", "n": len(ok), "errors": len(rs) - len(ok),
+            "ab": ab.get(pid),  # (побед, сравнений) в живых A/B
             "judge": _median([r["judge_overall"] for r in ok]),
             "human": _median([r["human_score"] for r in ok]),
             "coverage": sum(cov) / len(cov) if cov else None,

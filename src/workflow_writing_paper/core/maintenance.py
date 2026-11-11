@@ -42,10 +42,10 @@ def reindex(ws: Workspace) -> dict[str, int]:
     """Добавить в wwp.sqlite то, что есть в файлах, но нет в базе. Ничего не удаляет.
 
     Восстанавливаются: проекты в workspace/projects/, вызовы моделей (calls/*.json проектов и прогонов
-    стенда), решения автора «одобрить / override / отклонить» из заголовков артефактов. Очередь задач,
+    стенда), решения автора «одобрить / override / отклонить» и выборы A/B из заголовков артефактов. Очередь задач,
     решения «вернуть на правку» и оценки стенда хранятся только в базе и из файлов не восстанавливаются.
     """
-    added = {"projects": 0, "calls": 0, "approvals": 0}
+    added = {"projects": 0, "calls": 0, "approvals": 0, "ab_choices": 0}
     with closing(ws.db()) as db:
         for manifest in sorted((ws.root / "projects").glob("*/paper-workflow.yaml")):
             project = Project(ws, manifest.parent)
@@ -76,8 +76,19 @@ def reindex(ws: Workspace) -> dict[str, int]:
                 added["calls"] += 1
         have = {(r["project"], r["artifact"], r["version"], r["decision"])
                 for r in db.execute("SELECT project, artifact, version, decision FROM approvals")}
+        ab_have = {(r["project"], r["artifact"], r["provider_a"], r["provider_b"], r["chosen"], r["version"])
+                   for r in db.execute("SELECT * FROM ab_choices")}
         for project in projects:
             for art in _versions(project):
+                ab = art.meta.get("ab_chosen")
+                if ab:  # одна запись на выбор; ключ — версия, ставшая текущей после выбора
+                    row = (project.slug, art.type, ab["a"]["provider"], ab["b"]["provider"], ab[ab["chosen"]]["provider"],
+                           ab.get("version"))
+                    if row not in ab_have:
+                        db.execute("INSERT INTO ab_choices(project, artifact, role, provider_a, provider_b, chosen, version)"
+                                   " VALUES (?,?,?,?,?,?,?)", (*row[:2], ab.get("role"), *row[2:]))
+                        ab_have.add(row)
+                        added["ab_choices"] += 1
                 approved_at = art.meta.get("approved_at")
                 if approved_at:
                     decision = "override" if art.meta.get("override_reason") else "approve"

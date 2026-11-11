@@ -30,7 +30,8 @@ uv run wwp new topic --template explore            # изучение темы: 
 uv run wwp run topic collect --input "тема"        # OpenAlex → отбор → библиотека проекта → корпус на одобрение
 uv run wwp run my-paper novelty --input "абзац новизны"   # стадия без сервера
 uv run wwp run my-paper experiments --scenario bench-c6   # сценарий → results.json
-uv run wwp decide my-paper novelty approve                 # решение автора без веба: override --reason … | return | reject
+uv run wwp run my-paper novelty --ab ollama-qwen3-14b      # живое A/B: та же стадия второй моделью
+uv run wwp decide my-paper novelty a                       # выбор A/B; или approve | override --reason … | return | reject
 uv run wwp check my-paper  # только детерминированные проверки
 uv run wwp export my-paper --to pdf   # paper.md → docx/pdf через pandoc
 uv run wwp reindex         # восстановить wwp.sqlite из файлов (только добавляет)
@@ -39,6 +40,10 @@ uv run wwp lib import ~/papers/*.bib ~/papers/*.pdf   # библиотека: re
 uv run wwp lib search квантование edge               # полнотекстовый поиск по библиотеке
 uv run pytest              # тесты на провайдере fake, без GPU и ключей
 ```
+
+Без установки uv: `docker compose up --build` — веб-интерфейс на `127.0.0.1:8765` с pandoc и pdftotext,
+`workspace/` остаётся на хосте. Консольные провайдеры (`codex-cli`, `claude-cli`, `opencode-cli`) в образ не
+входят.
 
 Режим изучения темы (шаблон `explore`): автор вводит тему → `literature_scout` строит запросы → OpenAlex →
 модель оценивает релевантность по аннотациям → снежный ком по спискам литературы → записи и открытые PDF
@@ -78,6 +83,7 @@ JSON/CSV по `mapping` ложатся в `results.json` с seed, хэшем к�
 | v0.3 | библиотека: PDF, BibTeX, FTS5, OpenAlex; стадии `literature`, `experiment_plan`; проверка ключей `[@key]` |
 | v0.4 | запуск зарегистрированных сценариев экспериментов, локально и по SSH; парсер JSON/CSV по `mapping`; конфликты реестра |
 | v0.5 | автосбор литературы по теме (шаблон `explore`: сбор → одобрение корпуса → обзор → новизна из пробелов); лимиты журнала и перекрёстные ссылки в черновике; совпавшие блокеры судей первыми; `export`, `reindex`, `gc`, `decide`; эталоны для трёх новых ролей; живой сквозной путь до `paper.docx` на локальных моделях |
+| v0.6 (в работе) | живые A/B моделей с выбором автора; параллельные воркер и судьи; `docker compose`; образец профиля журнала |
 
 ## Лицензия
 

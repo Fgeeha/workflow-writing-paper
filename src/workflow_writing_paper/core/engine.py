@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
+from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import closing
 from typing import Any
 
@@ -38,8 +39,11 @@ def run_task(ws: Workspace, task_id: int) -> dict[str, Any]:
         row = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
         if row is None:
             raise ValueError(f"задачи {task_id} нет")
-        db.execute("UPDATE tasks SET status='running', started_at=datetime('now') WHERE id = ?", (task_id,))
+        cur = db.execute("UPDATE tasks SET status='running', started_at=datetime('now') WHERE id = ? AND status = 'queued'",
+                         (task_id,))
         db.commit()
+        if cur.rowcount == 0:  # задачу уже забрал воркер сервера или другой процесс
+            return {"error": f"задача {task_id} уже {row['status']}"}
     result: dict[str, Any] = {}
     error = None
     try:
@@ -68,19 +72,49 @@ def run_pending(ws: Workspace) -> int:
 
 
 class Worker(threading.Thread):
-    """Поток в процессе сервера: раз в секунду выполняет задачи из очереди по одной."""
+    """Поток в процессе сервера: раз в секунду раздаёт задачи очереди пулу.
+
+    Проекты — параллельно, до `worker.parallel` из providers.yaml (по умолчанию 2); у проекта одна задача за раз:
+    стадии пишут одни и те же артефакты. GPU-модели всё равно идут по одной — семафор провайдера.
+    """
 
     def __init__(self, ws: Workspace, interval: float = 1.0) -> None:
         super().__init__(daemon=True, name="wwp-worker")
         self.ws, self.interval, self._stop = ws, interval, threading.Event()
+        self._busy: set[str] = set()
+        self._lock = threading.Lock()
+
+    def tick(self, pool: ThreadPoolExecutor, parallel: int) -> list[Future[Any]]:
+        """Запустить по первой задаче очереди каждого свободного проекта, пока есть места."""
+        with closing(self.ws.db()) as db:
+            rows = db.execute("SELECT id, project FROM tasks WHERE status='queued' ORDER BY id").fetchall()
+        started = []
+        with self._lock:
+            for r in rows:
+                if r["project"] in self._busy or len(self._busy) >= parallel:
+                    continue
+                self._busy.add(r["project"])
+                started.append(pool.submit(self._run, r["id"], r["project"]))
+        return started
+
+    def _run(self, task_id: int, project: str) -> None:
+        try:
+            run_task(self.ws, task_id)
+        except Exception:
+            logger.exception("task %s", task_id)
+        finally:
+            with self._lock:
+                self._busy.discard(project)
 
     def run(self) -> None:
-        while not self._stop.is_set():
-            try:
-                run_pending(self.ws)
-            except Exception:
-                logger.exception("worker")
-            self._stop.wait(self.interval)
+        parallel = max(1, int((self.ws.config().get("worker") or {}).get("parallel", 2)))
+        with ThreadPoolExecutor(parallel, thread_name_prefix="wwp-task") as pool:
+            while not self._stop.is_set():
+                try:
+                    self.tick(pool, parallel)
+                except Exception:
+                    logger.exception("worker")
+                self._stop.wait(self.interval)
 
     def stop(self) -> None:
         self._stop.set()
