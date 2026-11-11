@@ -11,6 +11,7 @@ from workflow_writing_paper.core.artifact import Artifact
 from workflow_writing_paper.core.engine import enqueue, run_task
 from workflow_writing_paper.library import Library, LibraryError, is_stub, openalex
 from workflow_writing_paper.library.bibtex import make_key, normalize_doi, parse
+from workflow_writing_paper.review import _context
 from workflow_writing_paper.review.checks import citation_keys, deterministic_checks
 
 BIB = """
@@ -37,7 +38,7 @@ LITERATURE_OK = """## Позиционирование
 ## Оценка новизны
 Формулировка подтверждается: по аннотации [@ivanov2021plant] задержка не измерялась.
 ## Пробелы
-Не хватает работ по квантованию; кандидат на импорт: Lee, 2023, «Quantization at the edge».
+Не хватает работ по квантованию; запрос для OpenAlex: «post-training quantization edge inference».
 """
 
 PLAN_OK = """## Эксперименты
@@ -223,6 +224,10 @@ def test_citation_checks(tmp_path):
     issues = [b["issue"] for b in deterministic_checks(project, Artifact(type="draft", body=draft_bad),
                                                         ws.text("rubrics/draft.md"))]
     assert any("nobody2000" in i for i in issues)
+    ctx = _context(project, Artifact(type="literature", body=LITERATURE_OK))  # судья видит процитированные записи
+    assert "[@smith2020deep] Deep Learning on the Edge" in ctx and "[@stub1]" not in ctx
+    ctx = _context(project, Artifact(type="draft", body="## Введение\n\nТекст.\n"))
+    assert "Ещё не написаны: Постановка задачи" in ctx and "Введение," not in ctx
 
 
 # --- стадии -------------------------------------------------------------------------------------

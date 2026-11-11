@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import time
+from decimal import ROUND_HALF_UP, Context, Decimal
 from pathlib import Path
 from typing import Any
 
+_WIDE = Context(prec=400)  # quantize 1e27 до сотых требует больше 28 знаков по умолчанию
 _CODE_BLOCK = re.compile(r"```.*?```|`[^`\n]*`|\$\$.*?\$\$|\$[^$\n]*\$", re.DOTALL)
 # [key] / [Иванов, 2021] и (Иванов, 2021) / (Smith et al., 2021a) — но не «(задержка 95,5 мс на 1000 снимках)»
 _CITATION = re.compile(r"\[[^\]\n]*\]|\((?:[^()\n\d]*?[,\s])?(?:19|20)\d{2}[a-zа-я]?\)")
@@ -35,11 +38,16 @@ def add_manual(path: Path, key: str, value: float, unit: str = "", note: str = "
 
 
 def _matches(num: str, value: Any, rounding: int) -> bool:
-    if not isinstance(value, (int, float)) or isinstance(value, bool):
+    if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
         return False
-    n = float(num.replace(",", "."))
+    n = Decimal(num.replace(",", "."))
     decimals = len(re.split(r"[.,]", num)[-1]) if ("," in num or "." in num) else 0
-    return round(float(value), decimals) == n or round(float(value), rounding) == round(n, rounding)
+    return _round(value, decimals) == n or _round(value, rounding) == _round(n, rounding)
+
+
+def _round(value: Any, decimals: int) -> Decimal:
+    """Округление «как в статье» — половина вверх по десятичной записи: 3.505 → 3.51 (round() даёт 3.5)."""
+    return Decimal(str(value)).quantize(Decimal(1).scaleb(-decimals), rounding=ROUND_HALF_UP, context=_WIDE)
 
 
 def check_numbers(text: str, registry: dict[str, Any], rounding: int = 2) -> list[dict[str, Any]]:

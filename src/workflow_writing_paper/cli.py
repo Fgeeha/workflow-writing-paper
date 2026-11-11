@@ -95,6 +95,17 @@ def cmd_run(ws: Workspace, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_decide(ws: Workspace, args: argparse.Namespace) -> int:
+    from .core.project import Project
+
+    project = Project.open(ws, args.slug)
+    if args.decision == "override" and not args.reason:
+        raise ValueError("для override нужна причина (--reason)")
+    art = project.decide(args.artifact, args.decision, args.reason)
+    print(f"{art.type} v{art.version}: {art.status}")
+    return 0
+
+
 def cmd_review(ws: Workspace, args: argparse.Namespace) -> int:
     from .core.engine import enqueue, run_task
 
@@ -214,6 +225,11 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--section", help="раздел для стадии draft")
     run.add_argument("--scenario", help="id сценария для стадии experiments (если в манифесте не один)")
     run.add_argument("--force", action="store_true", help="experiments: перезаписать расходящиеся значения реестра")
+    decide = sub.add_parser("decide", help="решение автора по артефакту: одобрить, override, вернуть, отклонить")
+    decide.add_argument("slug")
+    decide.add_argument("artifact")
+    decide.add_argument("decision", choices=("approve", "override", "return", "reject"))
+    decide.add_argument("--reason", help="причина (обязательна для override)")
     review = sub.add_parser("review", help="перепроверить артефакт судьями без перегенерации")
     review.add_argument("slug")
     review.add_argument("artifact", nargs="?", default="draft")
@@ -236,7 +252,7 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     ws = Workspace(args.workspace)
     handlers = {"init": cmd_init, "serve": cmd_serve, "bench": cmd_bench, "new": cmd_new, "run": cmd_run,
-                "check": cmd_check, "review": cmd_review, "lib": cmd_lib, "export": cmd_export,
+                "check": cmd_check, "review": cmd_review, "decide": cmd_decide, "lib": cmd_lib, "export": cmd_export,
                 "reindex": cmd_reindex, "gc": cmd_gc}
     try:
         return handlers[args.cmd](ws, args)

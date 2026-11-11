@@ -120,6 +120,9 @@ def test_check_numbers_rules():
             "Скобки не прячут числа: (задержка 95,5 мс на 1000 снимках).\n")
     bl = check_numbers(text, reg, rounding=2)
     assert [b["number"] for b in bl] == ["0,65", "95,5", "1000"]
+    assert check_numbers("Параметров 3,51 млн, операций 300,8 млн.", {"p": {"value": 3.505}, "m": {"value": 300.8}}) == []
+    big = check_numbers("Задержка 95,5 мс.", {"flops": {"value": 1e27}, "x": {"value": float("inf")}})
+    assert [b["number"] for b in big] == ["95,5"]  # большие и бесконечные значения не роняют проверку
 
 
 def test_merge_section_order_and_replace():
@@ -129,6 +132,12 @@ def test_merge_section_order_and_replace():
     assert body.index("## Введение") < body.index("## Метод")
     body = merge_section(body, "Метод", "## Метод\n\nНовый текст.", order)
     assert body.count("## Метод") == 1 and "Новый текст" in body and "Текст метода" not in body
+    import pytest
+
+    from workflow_writing_paper.roles import StageError
+    for empty in ("", "## Метод", "## Метод\n\n  "):  # пустой ответ модели не затирает написанный раздел
+        with pytest.raises(StageError):
+            merge_section(body, "Метод", empty, order)
 
 
 def test_stale_and_decisions(tmp_path):

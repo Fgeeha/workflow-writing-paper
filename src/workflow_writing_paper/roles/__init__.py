@@ -126,7 +126,8 @@ def stage_novelty(project: Project, payload: dict[str, Any], task: str | None = 
     review = _approved(project, "literature", "Одобренный обзор литературы")
     if review:  # шаблон explore: литература раньше новизны — новизна выводится из пробелов обзора
         base += (f"\n\n{review}\n\nФормулировки новизны выведи из раздела «Пробелы» и оценки новизны обзора; "
-                 "опирайся только на работы обзора, ссылки — в форме [@ключ].")
+                 "опирайся только на работы обзора, ссылки — в форме [@ключ]. Что должен выбрать автор (метод, "
+                 "устройство, данные), помечай «[уточнить: …]». Без вступлений и обращений к автору — только текст.")
     final, provider = _author_critic_author(project, "ideator", base, task)
     project.write_artifact("novelty", final.text, _created_by("ideator", provider, final), source=source)
     return _review_loop(project, "novelty", task, _reviser(project, "novelty", "ideator", base, task))
@@ -174,7 +175,7 @@ def stage_literature(project: Project, payload: dict[str, Any], task: str | None
     suggested = 0 if corpus is not None else sum(lib.fetch_openalex(q, project.slug, settings) for q in queries[:3])
     ask = (f"{base}\n\n## Записи библиотеки — цитировать только их, строго в форме [@ключ]\n{_library_records(lib, queries)}"
            "\n\nНапиши обзор литературы по шаблону системного промпта. Работы, которых нет в списке, не цитируй: "
-           "назови их в разделе «Пробелы» как кандидатов на импорт.")
+           "в разделе «Пробелы» опиши недостающие темой и поисковым запросом, без авторов, годов и названий.")
     final, provider = _author_critic_author(project, "literature_scout", ask, task, 5000)
     project.write_artifact("literature", final.text, _created_by("literature_scout", provider, final))
     result = _review_loop(project, "literature", task, _reviser(project, "literature", "literature_scout", ask, task, 5000))
@@ -209,6 +210,8 @@ def merge_section(body: str, section: str, text: str, order: list[str]) -> str:
     first = text.splitlines()[0] if text else ""
     if not re.match(rf"^##\s*{re.escape(section)}\s*$", first, re.IGNORECASE):
         text = f"## {section}\n\n{text}"
+    if not text.split("\n", 1)[1:] or not text.split("\n", 1)[1].strip():  # пустой раздел не затирает написанный
+        raise StageError(f"раздел «{section}» пуст: модель не вернула текста, черновик не изменён")
     parts = {m.group(1).strip(): m.group(0).rstrip() for m in _SECTION.finditer(body)}
     parts = {k if k.lower() != section.lower() else section: v for k, v in parts.items()}
     parts[section] = text

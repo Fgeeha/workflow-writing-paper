@@ -18,7 +18,8 @@ from .workspace import Workspace
 
 logger = logging.getLogger(__name__)
 
-REGISTRY_RULE = "цитируемы только поля value; note — пояснение, числа из него в текст не переносятся"
+REGISTRY_RULE = ("цитируемы только поля value; note — пояснение, числа из него в текст не переносятся; в тексте value "
+                 "можно округлить до numbers.rounding знаков (половина вверх) и писать с разделителем профиля журнала")
 
 # Стадия → артефакт, который она производит. experiments пишет в реестр, assembly — paper.md.
 STAGE_ARTIFACT = {"collect": "corpus", "novelty": "novelty", "literature": "literature", "experiment_plan": "experiment_plan",

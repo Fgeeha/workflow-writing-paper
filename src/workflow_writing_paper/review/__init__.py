@@ -10,7 +10,7 @@ from ..core.artifact import Artifact
 from ..core.project import Project
 from ..providers import Provider, ProviderError, build_pool, call_logged, pick_judges
 from ..providers.decision import DecisionProvider
-from .checks import deterministic_checks
+from .checks import CITED_TYPES, citation_keys, deterministic_checks
 from .rubric import judge_schema, rubric_criteria, rubric_threshold, rubric_weights, weighted_overall
 
 
@@ -32,6 +32,17 @@ def _context(project: Project, art: Artifact) -> str:
     if art.meta.get("source"):
         parts.append("## Материалы автора (исходный ввод; всё, что есть в нём, считается подтверждённым)\n"
                      + str(art.meta["source"]))
+    if art.type == "draft":  # черновик пишется по разделу: ещё не написанные — не блокер
+        todo = [s for s in project.sections() if f"## {s}" not in art.body]
+        if todo:
+            parts.append("## Черновик пишется по разделам\nЕщё не написаны: " + ", ".join(todo)
+                         + ". Их отсутствие не блокер; оценивай написанные разделы.")
+    if art.type in CITED_TYPES:  # судья видит, на что ссылается текст; существование ключей проверяет checker
+        cited = citation_keys(art.body)
+        rows = [f"- [@{e.key}] {e.fields.get('title', '')} ({e.fields.get('year', '')})"
+                for e in project.library().entries() if e.key in cited]
+        if rows:
+            parts.append("## Процитированные записи библиотеки (ключи проверены автоматически)\n" + "\n".join(rows))
     return "\n\n".join(parts)
 
 

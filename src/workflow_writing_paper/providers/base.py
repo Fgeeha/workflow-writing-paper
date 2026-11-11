@@ -14,6 +14,7 @@ from typing import Any
 Message = dict[str, str]  # {"role": "system" | "user" | "assistant", "content": "..."}
 
 JSON_RETRIES = 2
+EMPTY_RETRIES = 1  # пустой ответ повторяется один раз
 _THINK = re.compile(r"<think>.*?</think>", re.DOTALL)
 _FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)
 
@@ -119,6 +120,11 @@ class Provider:
                 if "<think>" in text and "</think>" not in text:
                     raise ProviderError(f"{self.id}: ответ оборван внутри рассуждения <think> — не хватило "
                                         f"токенов; включите think: true или увеличьте num_predict", text)
+                if not _THINK.sub("", text).strip():  # весь лимит ушёл на скрытое рассуждение (think) или сбой модели
+                    if attempt < EMPTY_RETRIES:
+                        continue
+                    raise ProviderError(f"{self.id}: пустой ответ ({o} токенов на выход из {max_tokens}); если модель "
+                                        "рассуждает, выключите think: false или увеличьте лимит", text)
                 if json_schema is None:
                     break
                 data = extract_json(text)

@@ -30,6 +30,7 @@ uv run wwp new topic --template explore            # изучение темы: 
 uv run wwp run topic collect --input "тема"        # OpenAlex → отбор → библиотека проекта → корпус на одобрение
 uv run wwp run my-paper novelty --input "абзац новизны"   # стадия без сервера
 uv run wwp run my-paper experiments --scenario bench-c6   # сценарий → results.json
+uv run wwp decide my-paper novelty approve                 # решение автора без веба: override --reason … | return | reject
 uv run wwp check my-paper  # только детерминированные проверки
 uv run wwp export my-paper --to pdf   # paper.md → docx/pdf через pandoc
 uv run wwp reindex         # восстановить wwp.sqlite из файлов (только добавляет)
@@ -76,7 +77,7 @@ JSON/CSV по `mapping` ложатся в `results.json` с seed, хэшем к�
 | v0.2 | проекты, стадии, артефакты, проверка семействами, реестр результатов |
 | v0.3 | библиотека: PDF, BibTeX, FTS5, OpenAlex; стадии `literature`, `experiment_plan`; проверка ключей `[@key]` |
 | v0.4 | запуск зарегистрированных сценариев экспериментов, локально и по SSH; парсер JSON/CSV по `mapping`; конфликты реестра |
-| v0.5 (в работе) | автосбор литературы по теме (шаблон `explore`: сбор → одобрение корпуса → обзор → новизна из пробелов); лимиты журнала и перекрёстные ссылки в черновике; совпавшие блокеры судей первыми; `export`, `reindex`, `gc`; эталоны для трёх новых ролей; живая проверка на статье автора |
+| v0.5 | автосбор литературы по теме (шаблон `explore`: сбор → одобрение корпуса → обзор → новизна из пробелов); лимиты журнала и перекрёстные ссылки в черновике; совпавшие блокеры судей первыми; `export`, `reindex`, `gc`, `decide`; эталоны для трёх новых ролей; живой сквозной путь до `paper.docx` на локальных моделях |
 
 ## Лицензия
 
