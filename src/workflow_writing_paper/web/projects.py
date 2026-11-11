@@ -102,6 +102,21 @@ def register(app: FastAPI, ws: Workspace, render: Render) -> None:
             raise HTTPException(400, str(e)) from e
         return RedirectResponse(f"/projects/{slug}", status_code=303)
 
+    @app.post("/start")
+    async def start_from_scratch(request: Request) -> RedirectResponse:
+        """«Начать с нуля»: тема диссертации → проект explore → сбор литературы в очереди."""
+        form = await request.form()
+        topic = str(form.get("topic") or "").strip()
+        if len(topic) < 20:
+            raise HTTPException(400, "опишите тему и проблематику хотя бы одним предложением")
+        title = str(form.get("title") or "").strip() or topic.splitlines()[0][:120]
+        slug = start_slug(topic, {p["slug"] for p in _projects(ws)})
+        project = Project.create(ws, slug, template="explore", language=str(form.get("language") or "ru"))
+        project.manifest["title"] = title
+        project.save_manifest()
+        enqueue(ws, slug, "collect", {"input": topic})
+        return RedirectResponse(f"/projects/{slug}", status_code=303)
+
     @app.post("/projects/{slug}/path")
     async def rebind_path(slug: str, request: Request) -> RedirectResponse:
         new_path = str((await request.form()).get("path") or "").strip()
@@ -328,3 +343,24 @@ def register(app: FastAPI, ws: Workspace, render: Render) -> None:
         if rel == "library/refs.bib":
             Library(ws.root / "library").reindex()
         return RedirectResponse(f"/settings/edit?rel={rel}", status_code=303)
+
+
+_TRANSLIT = dict(zip("абвгдеёжзийклмнопрстуфхцчшщъыьэюя",
+                     ["a", "b", "v", "g", "d", "e", "e", "zh", "z", "i", "i", "k", "l", "m", "n", "o", "p", "r", "s",
+                      "t", "u", "f", "kh", "ts", "ch", "sh", "shch", "", "y", "", "e", "iu", "ia"], strict=True))
+
+
+def start_slug(topic: str, taken: set[str]) -> str:
+    """Имя папки проекта из первых слов темы: латиница, цифры, дефис; при совпадении — суффикс -2, -3 …"""
+    latin = "".join(_TRANSLIT.get(ch, ch) for ch in topic.lower())
+    words = ["".join(c for c in w if c.isascii() and c.isalnum()) for w in latin.split()]
+    kept: list[str] = []
+    for w in (w for w in words if len(w) > 2):
+        if len("-".join([*kept, w])) > 40:
+            break
+        kept.append(w)
+    base = "-".join(kept) or "thesis"
+    slug, n = base, 2
+    while slug in taken:
+        slug, n = f"{base}-{n}", n + 1
+    return slug

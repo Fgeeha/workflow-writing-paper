@@ -324,3 +324,24 @@ def test_cli_profile_assigns_roles(tmp_path, capsys):
     assert roles["ideator"] == "crit" and roles["judge"] == ["judge-x", "judge-y"] and roles["critic"] == "crit"
     assert "judge: judge-x, judge-y" in capsys.readouterr().out
     assert main(["--workspace", str(ws.root), "profile", "nope"]) == 2
+
+
+def test_start_from_scratch_creates_explore_project_and_queues_collect(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from workflow_writing_paper.web import create_app
+
+    ws, _ = make(tmp_path)
+    client = TestClient(create_app(ws, worker=False))
+    assert "Начать с нуля" in client.get("/").text
+    assert client.post("/start", data={"topic": "коротко"}).status_code == 400
+    topic = "Распознавание болезней листьев на одноплатном компьютере: перенос с лабораторных снимков на полевые."
+    r = client.post("/start", data={"topic": topic}, follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == "/projects/raspoznavanie-boleznei-listev"
+    r2 = client.post("/start", data={"topic": topic, "title": "Вторая"}, follow_redirects=False)
+    assert r2.headers["location"].endswith("-2")
+    project = Project.open(ws, "raspoznavanie-boleznei-listev")
+    assert project.manifest["template"] == "explore" and project.manifest["title"].startswith("Распознавание")
+    with ws.db() as db:
+        task = db.execute("SELECT stage, payload, status FROM tasks WHERE project = ?", (project.slug,)).fetchone()
+    assert task["stage"] == "collect" and task["status"] == "queued" and topic in json.loads(task["payload"])["input"]

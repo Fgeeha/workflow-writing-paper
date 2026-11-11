@@ -1,6 +1,22 @@
 {% extends "base.html" %}
 {% block title %}Главная{% endblock %}
 {% block content %}
+<section class="hero">
+  <h1>Начать с нуля</h1>
+  <p>Опишите тему и проблематику диссертации или статьи — что изучаете, какая задача не решена, какие методы
+  интересны. Дальше программа сама соберёт литературу из OpenAlex, предложит корпус на одобрение, напишет обзор
+  и выведет новизну из пробелов; на каждой стадии решение за вами.</p>
+  <form method="post" action="/start" class="start-form">
+    <textarea name="topic" rows="6" required minlength="20"
+      placeholder="Например: Распознавание болезней листьев по снимкам смартфона на одноплатном компьютере в поле. Лабораторные датасеты плохо переносятся на полевые снимки; нужны лёгкие модели и способ адаптации к новым условиям съёмки."></textarea>
+    <div class="start-row">
+      <input name="title" placeholder="Рабочее название (необязательно)" size="50">
+      <select name="language"><option value="ru">русский</option><option value="en">English</option></select>
+      <button class="primary">Начать</button>
+    </div>
+  </form>
+</section>
+
 <h1>Ожидают решения автора</h1>
 
 <h2>Артефакты на одобрении</h2>
