@@ -5,7 +5,7 @@
 <h1><code>{{ rel }}</code></h1>
 <form method="post" action="/settings/edit">
   <input type="hidden" name="rel" value="{{ rel }}">
-  <textarea name="text" rows="30" style="width:100%;font-family:monospace">{{ text }}</textarea>
-  <p><button>Сохранить в workspace</button></p>
+  <textarea name="text" rows="30" style="width:100%;font-family:var(--mono)">{{ text }}</textarea>
+  <p><button class="primary">Сохранить в workspace</button></p>
 </form>
 {% endblock %}

@@ -5,7 +5,7 @@
 <h1>Реестр результатов</h1>
 <p class="muted">Единственный источник чисел для текста статьи. Пишут сюда парсер сценариев и эта форма.</p>
 {% for c in conflicts %}
-<p class="rec" style="border-color:#b3261e;background:#f8e8e6">Задача #{{ c.id }}: {{ c.error }}</p>
+<p class="rec warn">Задача #{{ c.id }}: {{ c.error }}</p>
 {% endfor %}
 <table>
   <tr><th>ключ</th><th>значение</th><th>ед.</th><th>источник</th><th>когда</th><th>seed · команда · git</th><th>примечание</th></tr>
@@ -17,12 +17,12 @@
   {% else %}<tr><td colspan="7" class="muted">Пусто.</td></tr>{% endfor %}
 </table>
 <h2>Ручной ввод</h2>
-<form method="post" action="/projects/{{ project.slug }}/registry">
+<form method="post" action="/projects/{{ project.slug }}/registry" class="field-row">
   ключ <input name="key" required pattern="[A-Za-z0-9_]+" placeholder="latency_p50_ms">
   значение <input name="value" required placeholder="103.32" size="10">
   ед. <input name="unit" size="6" placeholder="ms">
   примечание <input name="note" size="30">
-  <button>записать</button>
+  <button class="primary">записать</button>
 </form>
 <h2>Сценарии экспериментов</h2>
 <table>
@@ -33,7 +33,7 @@
       <td class="muted">{{ s.results|join(', ') }} → {{ s.mapping.values()|join(', ') }}</td>
       <td style="white-space:nowrap">
         {% if can_run %}
-        <form method="post" action="/projects/{{ project.slug }}/scenarios/{{ s.id }}/run" style="display:inline"><button>запустить</button></form>
+        <form method="post" action="/projects/{{ project.slug }}/scenarios/{{ s.id }}/run" style="display:inline"><button class="primary">запустить</button></form>
         <form method="post" action="/projects/{{ project.slug }}/scenarios/{{ s.id }}/run" style="display:inline"><input type="hidden" name="force" value="1"><button title="перезаписать расходящиеся значения">запустить с перезаписью</button></form>
         {% else %}<span class="muted">стадия experiments пока недоступна (гейт)</span>{% endif %}
       </td></tr>

@@ -31,7 +31,7 @@
 <h2>Профили</h2>
 {% for name, roles_ in profiles.items() %}
 <form method="post" action="/pool/profile/{{ name }}" style="display:inline">
-  <button type="submit" title="{{ roles_ }}">{{ name }}</button>
+  <button type="submit" class="secondary" title="{{ roles_ }}">{{ name }}</button>
 </form>
 {% endfor %}
 {% endif %}
