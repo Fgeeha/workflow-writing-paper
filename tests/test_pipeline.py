@@ -313,3 +313,14 @@ def test_draft_limits_and_cross_refs_only_when_complete(tmp_path):
     bl = agreed_first([{"judge": "a", "line": 3, "issue": "x"}, {"judge": "b", "line": "5–7", "issue": "y"},
                        {"judge": "b", "line": 3, "issue": "z"}, {"judge": "checker", "line": 9, "issue": "w"}])
     assert [b["issue"] for b in bl] == ["x", "z", "y", "w"] and bl[0]["agreed"] and not bl[2]["agreed"]
+
+
+def test_cli_profile_assigns_roles(tmp_path, capsys):
+    from workflow_writing_paper.cli import main
+
+    ws, _ = make(tmp_path, {**POOL, "profiles": {"fast": {"ideator": "crit", "judge": ["judge-x", "judge-y"]}}})
+    assert main(["--workspace", str(ws.root), "profile", "fast"]) == 0
+    roles = ws.config()["roles"]
+    assert roles["ideator"] == "crit" and roles["judge"] == ["judge-x", "judge-y"] and roles["critic"] == "crit"
+    assert "judge: judge-x, judge-y" in capsys.readouterr().out
+    assert main(["--workspace", str(ws.root), "profile", "nope"]) == 2

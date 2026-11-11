@@ -490,6 +490,7 @@ numbers: {decimal_separator: ",", rounding: 2}
 ```
 wwp init [--workspace PATH]           создать workspace из defaults
 wwp serve [--host 127.0.0.1 --port 8765]
+wwp profile <имя>                     назначить роли и судей по профилю providers.yaml (local-only, local-light, quality)
 wwp new <slug> --template experimental [--path /external/dir]
 wwp run <slug> <stage> [--scenario ID] [--force]   выполнить стадию; experiments — сценарий → реестр
 wwp run <slug> <stage> --ab <provider>  живое A/B: стадия моделью роли и моделью B, выбор за автором

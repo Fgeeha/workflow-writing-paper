@@ -13,6 +13,25 @@ providers:
     gpu: true
     exclusive_group: local-gpu
     num_ctx: 32768
+  # Та же gemma4 без рассуждения: для длинного текста (section_writer, editor). С рассуждением лимит
+  # 6000 токенов уходит на think и ответ пуст; без него раздел пишется втрое быстрее (docs/BENCH-LOG.md).
+  - id: ollama-gemma4-12b-nt
+    kind: ollama
+    family: gemma
+    model: gemma4:12b
+    url: http://127.0.0.1:11434
+    gpu: true
+    exclusive_group: local-gpu
+    num_ctx: 32768
+    think: false
+  - id: ollama-gemma4-e4b      # для видеокарт на 8 ГБ: критик 8,4 против 9,05 у 12b
+    kind: ollama
+    family: gemma
+    model: gemma4:e4b
+    gpu: true
+    exclusive_group: local-gpu
+    num_ctx: 32768
+    think: false
   - id: ollama-qwen3-14b
     kind: ollama
     family: qwen
@@ -137,9 +156,14 @@ roles:                       # назначение по умолчанию; п�
   literature_scout: ollama-gemma4-12b
   experiment_planner: codex
   section_writer: codex
-  editor: ollama-gemma4-12b
+  editor: ollama-gemma4-12b-nt
   judge: [claude, codex, ollama-gpt-oss-20b, kev-9b, ollama-phi4-reasoning-14b, ollama-gemma3-12b]
 
 profiles:                    # быстрые переключатели в интерфейсе
-  local-only: {ideator: ollama-gemma4-12b, section_writer: ollama-gemma4-12b, experiment_planner: ollama-qwen3-14b}
+  local-only: {ideator: ollama-gemma4-12b, critic: ollama-gemma4-12b, literature_scout: ollama-gemma4-12b,
+               experiment_planner: ollama-gemma4-12b-nt, section_writer: ollama-gemma4-12b-nt, editor: ollama-gemma4-12b-nt,
+               judge: [ollama-gpt-oss-20b, ollama-phi4-reasoning-14b, kev-9b]}
+  local-light: {ideator: ollama-gemma4-e4b, critic: ollama-gemma4-e4b, literature_scout: ollama-gemma4-e4b,
+                experiment_planner: ollama-gemma4-e4b, section_writer: ollama-gemma4-e4b, editor: ollama-gemma4-e4b,
+                judge: [ollama-gpt-oss-20b, ollama-phi4-reasoning-14b]}   # судьи те же, грузятся по одной
   quality:    {ideator: codex, section_writer: codex, experiment_planner: codex}

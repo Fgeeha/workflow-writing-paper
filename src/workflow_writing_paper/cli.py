@@ -120,6 +120,18 @@ def cmd_decide(ws: Workspace, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_profile(ws: Workspace, args: argparse.Namespace) -> int:
+    cfg = ws.config()
+    profiles = cfg.get("profiles") or {}
+    if args.name not in profiles:
+        raise ValueError(f"профиля {args.name} нет; есть: {', '.join(profiles) or '—'}")
+    cfg["roles"] = {**(cfg.get("roles") or {}), **profiles[args.name]}
+    ws.save_config(cfg)
+    for role, pid in cfg["roles"].items():
+        print(f"{role}: {', '.join(pid) if isinstance(pid, list) else pid}")
+    return 0
+
+
 def cmd_review(ws: Workspace, args: argparse.Namespace) -> int:
     from .core.engine import enqueue, run_task
 
@@ -245,6 +257,7 @@ def main(argv: list[str] | None = None) -> int:
     decide.add_argument("artifact")
     decide.add_argument("decision", choices=("approve", "override", "return", "reject", "a", "b"))
     decide.add_argument("--reason", help="причина (обязательна для override)")
+    sub.add_parser("profile", help="назначить роли по профилю из providers.yaml (local-only, quality …)").add_argument("name")
     review = sub.add_parser("review", help="перепроверить артефакт судьями без перегенерации")
     review.add_argument("slug")
     review.add_argument("artifact", nargs="?", default="draft")
@@ -267,7 +280,7 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     ws = Workspace(args.workspace)
     handlers = {"init": cmd_init, "serve": cmd_serve, "bench": cmd_bench, "new": cmd_new, "run": cmd_run,
-                "check": cmd_check, "review": cmd_review, "decide": cmd_decide, "lib": cmd_lib, "export": cmd_export,
+                "check": cmd_check, "review": cmd_review, "decide": cmd_decide, "profile": cmd_profile, "lib": cmd_lib, "export": cmd_export,
                 "reindex": cmd_reindex, "gc": cmd_gc}
     try:
         return handlers[args.cmd](ws, args)
