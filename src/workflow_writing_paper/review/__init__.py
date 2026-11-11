@@ -47,6 +47,27 @@ def _locate(blockers: list[dict[str, Any]], body: str) -> list[dict[str, Any]]:
     return blockers
 
 
+def _line(b: dict[str, Any]) -> int:
+    """Номер строки блокера; судья-модель может вернуть «5–7» или текст — тогда 0."""
+    try:
+        return int(b.get("line") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def agreed_first(blockers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Блокеры, которые на одной строке нашли хотя бы два судьи-модели, — с `agreed` и в начале списка.
+
+    ponytail: совпадение — только по номеру строки; два разных замечания к одной строке тоже «совпадут».
+    """
+    judges_by_line: dict[int, set[str]] = {}
+    for b in blockers:
+        if _line(b) and b.get("judge") != "checker":
+            judges_by_line.setdefault(_line(b), set()).add(str(b.get("judge")))
+    out = [{**b, "agreed": len(judges_by_line.get(_line(b), ())) >= 2} for b in blockers]
+    return sorted(out, key=lambda b: not b["agreed"])  # sorted устойчив: внутри групп порядок судей
+
+
 def estimate_cost_usd(judges: list[Provider], prompt_chars: int, max_tokens: int) -> float:
     """Грубая оценка стоимости проверки по таблице цен: ~4 символа на токен входа плюс полный выход."""
     return sum(j.cost(prompt_chars // 4, max_tokens) for j in judges)
@@ -134,7 +155,8 @@ def review_artifact(project: Project, type_: str, task: str | None = None) -> di
         paths.append(str(p.relative_to(project.path)))
 
     overalls = [r["overall"] for r in reports.values() if r["overall"] is not None]
-    all_blockers = [{**b, "judge": jid} for jid, r in reports.items() for b in r["blockers"]]
+    all_blockers = agreed_first([{**b, "judge": jid} for jid, r in reports.items() for b in r["blockers"]])
+    agreed = [b for b in all_blockers if b["agreed"]]
     errors = [f"{jid}: {r['error']}" for jid, r in reports.items() if r["error"]]
     accepted = len(overalls) >= n and min(overalls) >= threshold and not all_blockers
 
@@ -142,10 +164,11 @@ def review_artifact(project: Project, type_: str, task: str | None = None) -> di
     art.meta["reviews"] = paths
     art.meta["review_summary"] = {"accepted": accepted, "threshold": threshold,
                                   "min_overall": min(overalls) if overalls else None,
-                                  "blockers": len(all_blockers), "errors": errors}
+                                  "blockers": len(all_blockers), "errors": errors,
+                                  "agreed": [{k: b.get(k) for k in ("line", "judge", "issue", "quote")} for b in agreed]}
     project.update_artifact(art)
     return {"accepted": accepted, "threshold": threshold, "min_overall": min(overalls) if overalls else None,
             "blockers": all_blockers, "errors": errors, "reports": reports}
 
 
-__all__ = ["ReviewError", "estimate_cost_usd", "review_artifact", "verdict"]
+__all__ = ["ReviewError", "agreed_first", "estimate_cost_usd", "review_artifact", "verdict"]

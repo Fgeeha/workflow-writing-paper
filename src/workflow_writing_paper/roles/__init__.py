@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from ..core.project import Project
@@ -282,17 +283,29 @@ def stage_assembly(project: Project, payload: dict[str, Any], task: str | None =
     (project.path / "paper.md").write_text(paper, encoding="utf-8")
     outputs = ["paper.md"]
     if shutil.which("pandoc"):
-        out = project.path / "paper.docx"
-        cmd = ["pandoc", str(project.path / "paper.md"), "-o", str(out)]
-        bib = project.ws.root / "library" / "refs.bib"
-        if bib.exists():  # ссылки [@ключ] → список литературы
-            cmd += ["--citeproc", "--bibliography", str(bib)]
-        proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
-        if proc.returncode == 0:
-            outputs.append(out.name)
-        else:
-            logger.warning("pandoc: %s", proc.stderr.strip()[-300:])
+        try:
+            outputs.append(export(project, "docx").name)
+        except StageError as e:
+            logger.warning("%s", e)
     return {"accepted": True, "outputs": outputs, "version": art.version}
+
+
+def export(project: Project, to: str = "docx") -> Path:
+    """paper.md → paper.<to> через внешний pandoc; ссылки [@ключ] разворачиваются по refs.bib (--citeproc)."""
+    src = project.path / "paper.md"
+    if not src.exists():
+        raise StageError("paper.md нет: сначала стадия assembly")
+    if not shutil.which("pandoc"):
+        raise StageError("pandoc не установлен")
+    out = project.path / f"paper.{to}"
+    cmd = ["pandoc", str(src), "-o", str(out)]
+    bib = project.ws.root / "library" / "refs.bib"
+    if bib.exists():
+        cmd += ["--citeproc", "--bibliography", str(bib)]
+    proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
+    if proc.returncode:
+        raise StageError(f"pandoc → {to}: {proc.stderr.strip()[-300:]}")
+    return out
 
 
 STAGES = {"novelty": stage_novelty, "literature": stage_literature, "experiment_plan": stage_experiment_plan,
@@ -308,4 +321,4 @@ def run_stage(project: Project, stage: str, payload: dict[str, Any], task: str |
     return STAGES[stage](project, payload, task)
 
 
-__all__ = ["NOT_YET", "STAGES", "StageError", "call_role", "merge_section", "run_stage"]
+__all__ = ["NOT_YET", "STAGES", "StageError", "call_role", "export", "merge_section", "run_stage"]

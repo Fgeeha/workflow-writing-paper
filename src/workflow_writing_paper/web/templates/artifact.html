@@ -22,6 +22,12 @@
 {% endif %}
 
 <h2>Проверки</h2>
+{% set agreed = (art.meta.review_summary or {}).agreed or [] %}
+{% if agreed %}
+<div class="rec"><b>Совпало у нескольких судей — исправлять первым:</b>
+  {% for b in agreed %}<p class="bad">строка {{ b.line }} [{{ b.judge }}]: {{ b.issue }}{% if b.quote %} — «{{ b.quote }}»{% endif %}</p>{% endfor %}
+</div>
+{% endif %}
 {% for r in reviews %}
 <details {% if r.blockers or r.error %}open{% endif %}>
   <summary><b>{{ r.judge.provider }}</b> ({{ r.judge.family }}) —

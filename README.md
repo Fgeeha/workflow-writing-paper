@@ -29,6 +29,9 @@ uv run wwp new my-paper --template experimental   # проект в workspace/pr
 uv run wwp run my-paper novelty --input "абзац новизны"   # стадия без сервера
 uv run wwp run my-paper experiments --scenario bench-c6   # сценарий → results.json
 uv run wwp check my-paper  # только детерминированные проверки
+uv run wwp export my-paper --to pdf   # paper.md → docx/pdf через pandoc
+uv run wwp reindex         # восстановить wwp.sqlite из файлов (только добавляет)
+uv run wwp gc --older-than 90d        # что удалить из старых вызовов и истории; --apply — удалить
 uv run wwp lib import ~/papers/*.bib ~/papers/*.pdf   # библиотека: refs.bib, pdf/, индекс FTS5
 uv run wwp lib search квантование edge               # полнотекстовый поиск по библиотеке
 uv run pytest              # тесты на провайдере fake, без GPU и ключей
@@ -66,6 +69,7 @@ JSON/CSV по `mapping` ложатся в `results.json` с seed, хэшем к�
 | v0.2 | проекты, стадии, артефакты, проверка семействами, реестр результатов |
 | v0.3 | библиотека: PDF, BibTeX, FTS5, OpenAlex; стадии `literature`, `experiment_plan`; проверка ключей `[@key]` |
 | v0.4 | запуск зарегистрированных сценариев экспериментов, локально и по SSH; парсер JSON/CSV по `mapping`; конфликты реестра |
+| v0.5 (в работе) | лимиты журнала и перекрёстные ссылки в черновике; совпавшие блокеры судей первыми; `export`, `reindex`, `gc`; эталоны для трёх новых ролей; живая проверка на статье автора |
 
 ## Лицензия
 

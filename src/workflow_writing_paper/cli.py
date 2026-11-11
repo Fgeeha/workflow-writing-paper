@@ -146,6 +146,44 @@ def cmd_lib(ws: Workspace, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_export(ws: Workspace, args: argparse.Namespace) -> int:
+    from .core import Project
+    from .roles import StageError, export
+
+    try:
+        out = export(Project.open(ws, args.slug), args.to)
+    except StageError as e:
+        print(f"ошибка: {e}", file=sys.stderr)
+        return 1
+    print(out)
+    return 0
+
+
+def cmd_reindex(ws: Workspace, args: argparse.Namespace) -> int:
+    from .core.maintenance import reindex
+
+    added = reindex(ws)
+    print("добавлено в wwp.sqlite: " + ", ".join(f"{k} {v}" for k, v in added.items()))
+    return 0
+
+
+def _days(text: str) -> float:
+    """`90d`, `12h` или число дней."""
+    unit = {"d": 1.0, "h": 1 / 24}.get(text[-1:])
+    return float(text[:-1]) * unit if unit else float(text)
+
+
+def cmd_gc(ws: Workspace, args: argparse.Namespace) -> int:
+    from .core.maintenance import gc
+
+    files = gc(ws, _days(args.older_than), apply=args.apply)
+    for p in files:
+        print(p)
+    verb = "удалено" if args.apply else "к удалению (запустите с --apply)"
+    print(f"{verb}: {len(files)} файлов")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="wwp", description="Конвейер написания научных статей")
     parser.add_argument("--workspace", help="папка workspace (по умолчанию ./workspace или $WWP_WORKSPACE)")
@@ -182,11 +220,19 @@ def main(argv: list[str] | None = None) -> int:
     lib_sub.add_parser("import", help="импортировать файлы .bib и .pdf").add_argument("paths", nargs="+")
     lib_sub.add_parser("search", help="полнотекстовый поиск").add_argument("query", nargs="+")
     lib_sub.add_parser("reindex", help="пересобрать index.sqlite из refs.bib и pdf/")
+    export = sub.add_parser("export", help="paper.md → docx или pdf через pandoc")
+    export.add_argument("slug")
+    export.add_argument("--to", choices=("docx", "pdf"), default="docx")
+    sub.add_parser("reindex", help="добавить в wwp.sqlite проекты, вызовы и решения из файлов")
+    gc = sub.add_parser("gc", help="удалить старые записи вызовов и неодобренные версии из истории")
+    gc.add_argument("--older-than", default="90d", help="срок: 90d, 12h или число дней (по умолчанию 90d)")
+    gc.add_argument("--apply", action="store_true", help="удалить; без флага только показать список")
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     ws = Workspace(args.workspace)
     handlers = {"init": cmd_init, "serve": cmd_serve, "bench": cmd_bench, "new": cmd_new, "run": cmd_run,
-                "check": cmd_check, "review": cmd_review, "lib": cmd_lib}
+                "check": cmd_check, "review": cmd_review, "lib": cmd_lib, "export": cmd_export,
+                "reindex": cmd_reindex, "gc": cmd_gc}
     try:
         return handlers[args.cmd](ws, args)
     except (FileNotFoundError, FileExistsError, ValueError, LibraryError) as e:

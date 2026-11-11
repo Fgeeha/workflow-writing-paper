@@ -214,6 +214,9 @@ def test_review_and_assembly_stages(tmp_path):
     project.decide("novelty", "approve")
     for st in ("literature", "experiment_plan"):
         project.skip_stage(st, "тест")
+    journal = ws.root / "journals" / "generic.yaml"  # путь до сборки, а не лимиты: минимум источников снят
+    journal.write_text(journal.read_text(encoding="utf-8").replace("references_min: 15", "references_min: 0"),
+                       encoding="utf-8")
     body = "\n\n".join(f"## {s}\n\nТекст раздела без чисел." for s in project.sections())
     project.write_artifact("draft", body, by)
     assert project.stage_state("draft") == "complete"  # написан, но не одобрен
@@ -271,3 +274,33 @@ def test_novelty_rerun_uses_author_source_not_model_text(tmp_path):
     ws2, _ = make(tmp_path / "second")
     res = run_task(ws2, enqueue(ws2, "demo", "novelty", {}))
     assert "нужен абзац новизны" in res["error"]
+
+
+def test_draft_limits_and_cross_refs_only_when_complete(tmp_path):
+    from workflow_writing_paper.review import agreed_first
+    from workflow_writing_paper.review.checks import cross_refs, deterministic_checks
+
+    body = ("Как видно из табл. 1 и рис. 2, всё сходится; см. также таблицу 3.\n\n"
+            "**Таблица 1.** Задержка\n\n![Рисунок 2 — схема](x.png)\n\nРисунок 4. Без ссылки\n")
+    issues = sorted(b["issue"] for b in cross_refs(body))
+    assert issues == ["на рисунок 4 нет ссылки в тексте", "ссылка на табл. 3, но подписи «Таблица 3» нет"]
+    assert cross_refs("Риски 2 и 3 — не ссылки на рисунки.") == []
+    assert cross_refs("Таблица 1 показывает рост")[0]["issue"].startswith("ссылка на табл. 1")  # не подпись
+
+    ws, project = make(tmp_path)
+    by = {"role": "section_writer", "provider": "writer", "family": "a"}
+    rubric = ws.text("rubrics/draft.md")
+    sections = project.sections()
+    project.write_artifact("draft", f"## {sections[0]}\n\nСм. табл. 7.\n", by)  # неполный черновик
+    assert not [b for b in deterministic_checks(project, project.artifact("draft"), rubric)
+                if "табл" in b["issue"] or "источников" in b["issue"]]
+    full = "\n\n".join(f"## {s}\n\nСм. табл. 7." for s in sections)
+    project.write_artifact("draft", "## Аннотация\n\n" + "слово " * 300 + "\n\n" + full, by)
+    issues = [b["issue"] for b in deterministic_checks(project, project.artifact("draft"), rubric)]
+    assert any("аннотация 300 слов" in i for i in issues)
+    assert any("источников 0 при минимуме журнала 15" in i for i in issues)
+    assert any("подписи «Таблица 7» нет" in i for i in issues)
+
+    bl = agreed_first([{"judge": "a", "line": 3, "issue": "x"}, {"judge": "b", "line": "5–7", "issue": "y"},
+                       {"judge": "b", "line": 3, "issue": "z"}, {"judge": "checker", "line": 9, "issue": "w"}])
+    assert [b["issue"] for b in bl] == ["x", "z", "y", "w"] and bl[0]["agreed"] and not bl[2]["agreed"]
