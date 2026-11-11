@@ -26,6 +26,8 @@ uv run wwp init            # создаёт workspace/ из defaults/
 uv run wwp serve           # http://127.0.0.1:8765: пул моделей, стенд, журнал вызовов
 uv run wwp bench --role critic --providers ollama-gemma4-12b,ollama-qwen3-14b,ollama-lfm25-8b
 uv run wwp new my-paper --template experimental   # проект в workspace/projects/my-paper
+uv run wwp new topic --template explore            # изучение темы: литература собирается сама
+uv run wwp run topic collect --input "тема"        # OpenAlex → отбор → библиотека проекта → корпус на одобрение
 uv run wwp run my-paper novelty --input "абзац новизны"   # стадия без сервера
 uv run wwp run my-paper experiments --scenario bench-c6   # сценарий → results.json
 uv run wwp check my-paper  # только детерминированные проверки
@@ -36,6 +38,11 @@ uv run wwp lib import ~/papers/*.bib ~/papers/*.pdf   # библиотека: re
 uv run wwp lib search квантование edge               # полнотекстовый поиск по библиотеке
 uv run pytest              # тесты на провайдере fake, без GPU и ключей
 ```
+
+Режим изучения темы (шаблон `explore`): автор вводит тему → `literature_scout` строит запросы → OpenAlex →
+модель оценивает релевантность по аннотациям → снежный ком по спискам литературы → записи и открытые PDF
+в собственной библиотеке проекта → автор одним решением одобряет корпус или вычёркивает лишнее → обзор →
+новизна из пробелов обзора → дальше как обычно.
 
 Сквозной путь: автор вводит новизну → ideator → critic → ideator → `novelty.md` → два судьи
 других семейств + детерминированный `checker` → решение автора (одобрить / override / вернуть /
@@ -69,7 +76,7 @@ JSON/CSV по `mapping` ложатся в `results.json` с seed, хэшем к�
 | v0.2 | проекты, стадии, артефакты, проверка семействами, реестр результатов |
 | v0.3 | библиотека: PDF, BibTeX, FTS5, OpenAlex; стадии `literature`, `experiment_plan`; проверка ключей `[@key]` |
 | v0.4 | запуск зарегистрированных сценариев экспериментов, локально и по SSH; парсер JSON/CSV по `mapping`; конфликты реестра |
-| v0.5 (в работе) | лимиты журнала и перекрёстные ссылки в черновике; совпавшие блокеры судей первыми; `export`, `reindex`, `gc`; эталоны для трёх новых ролей; живая проверка на статье автора |
+| v0.5 (в работе) | автосбор литературы по теме (шаблон `explore`: сбор → одобрение корпуса → обзор → новизна из пробелов); лимиты журнала и перекрёстные ссылки в черновике; совпавшие блокеры судей первыми; `export`, `reindex`, `gc`; эталоны для трёх новых ролей; живая проверка на статье автора |
 
 ## Лицензия
 

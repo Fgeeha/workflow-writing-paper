@@ -116,10 +116,17 @@ def _approved(project: Project, type_: str, title: str) -> str:
 def stage_novelty(project: Project, payload: dict[str, Any], task: str | None = None) -> dict[str, Any]:
     seed = str(payload.get("input") or "").strip()
     prev = project.artifact("novelty")
-    source = seed or str((prev.meta.get("source") if prev else None) or "")  # только текст автора, не модели
+    corpus = project.artifact("corpus")
+    # только текст автора, не модели: его абзац, прежний ввод или тема, с которой начат сбор литературы
+    source = seed or str((prev.meta.get("source") if prev else None) or "") or str(
+        (corpus.meta.get("source") if corpus and corpus.status == "approved" else None) or "")
     if not source:
         raise StageError("нужен абзац новизны от автора (payload.input)")
     base = f"{project.context_header(with_registry=False)}\n\n## Формулировка автора\n{source}"
+    review = _approved(project, "literature", "Одобренный обзор литературы")
+    if review:  # шаблон explore: литература раньше новизны — новизна выводится из пробелов обзора
+        base += (f"\n\n{review}\n\nФормулировки новизны выведи из раздела «Пробелы» и оценки новизны обзора; "
+                 "опирайся только на работы обзора, ссылки — в форме [@ключ].")
     final, provider = _author_critic_author(project, "ideator", base, task)
     project.write_artifact("novelty", final.text, _created_by("ideator", provider, final), source=source)
     return _review_loop(project, "novelty", task, _reviser(project, "novelty", "ideator", base, task))
@@ -146,20 +153,25 @@ def _library_records(lib: Library, queries: list[str]) -> str:
 def stage_literature(project: Project, payload: dict[str, Any], task: str | None = None) -> dict[str, Any]:
     """literature_scout: запросы → поиск в библиотеке (и OpenAlex на подтверждение) → обзор только по ключам refs.bib."""
     novelty = project.artifact("novelty")
-    if novelty is None:
-        raise StageError("нет артефакта novelty")
-    lib = Library(project.ws.root / "library")
+    corpus = project.artifact("corpus")
+    origin = novelty if novelty is not None else corpus if corpus and corpus.status == "approved" else None
+    if origin is None:
+        raise StageError("нет артефакта novelty (или одобренного корпуса collect)")
+    # шаблон explore: новизны ещё нет — обзор по теме собранного корпуса
+    subject = f"## Новизна\n{origin.body}" if origin is novelty else f"## Тема исследования\n{origin.meta.get('source') or ''}"
+    lib = project.library()
     hint = str(payload.get("input") or "").strip()
-    base = f"{project.context_header(with_registry=False)}\n\n## Новизна\n{novelty.body}"
+    base = f"{project.context_header(with_registry=False)}\n\n{subject}"
     if hint:
         base += f"\n\n## Указания автора\n{hint}"
     comp, _ = call_role(project, "literature_scout", f"{base}\n\nСформулируй 3–6 коротких поисковых запросов "
                         "(2–5 слов, на языке литературы по теме) для поиска близких работ. Ответ — JSON {\"queries\": [...]}.",
                         task, 600, json_schema=QUERIES_SCHEMA)
     queries = [str(q).strip() for q in (comp.data or {}).get("queries", []) if str(q).strip()][:6]
-    queries = queries or [str(novelty.meta.get("source") or novelty.body)[:120]]
+    queries = queries or [str(origin.meta.get("source") or origin.body)[:120]]
     settings = project.ws.config().get("library") or {}
-    suggested = sum(lib.fetch_openalex(q, project.slug, settings) for q in queries[:3])
+    # своя библиотека уже собрана стадией collect — предложения OpenAlex только для общей
+    suggested = 0 if corpus is not None else sum(lib.fetch_openalex(q, project.slug, settings) for q in queries[:3])
     ask = (f"{base}\n\n## Записи библиотеки — цитировать только их, строго в форме [@ключ]\n{_library_records(lib, queries)}"
            "\n\nНапиши обзор литературы по шаблону системного промпта. Работы, которых нет в списке, не цитируй: "
            "назови их в разделе «Пробелы» как кандидатов на импорт.")
@@ -299,7 +311,7 @@ def export(project: Project, to: str = "docx") -> Path:
         raise StageError("pandoc не установлен")
     out = project.path / f"paper.{to}"
     cmd = ["pandoc", str(src), "-o", str(out)]
-    bib = project.ws.root / "library" / "refs.bib"
+    bib = project.library().bib_path
     if bib.exists():
         cmd += ["--citeproc", "--bibliography", str(bib)]
     proc = subprocess.run(cmd, check=False, capture_output=True, text=True)
@@ -308,7 +320,14 @@ def export(project: Project, to: str = "docx") -> Path:
     return out
 
 
-STAGES = {"novelty": stage_novelty, "literature": stage_literature, "experiment_plan": stage_experiment_plan,
+def stage_collect(project: Project, payload: dict[str, Any], task: str | None = None) -> dict[str, Any]:
+    """Сбор литературы по теме: см. roles/collect.py."""
+    from .collect import stage_collect as run
+
+    return run(project, payload, task)
+
+
+STAGES = {"collect": stage_collect, "novelty": stage_novelty, "literature": stage_literature, "experiment_plan": stage_experiment_plan,
           "experiments": stage_experiments, "draft": stage_draft, "review": stage_review, "assembly": stage_assembly}
 NOT_YET: dict[str, str] = {}  # стадии, ещё не реализованные: id → версия
 

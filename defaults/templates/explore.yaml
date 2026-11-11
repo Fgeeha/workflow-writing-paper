@@ -1,0 +1,12 @@
+# Изучение темы: литература собирается автоматически (OpenAlex → отбор → библиотека проекта),
+# корпус подтверждается автором одним решением, новизна выводится из пробелов обзора.
+library: project
+stages:
+  - {id: collect,         required: true}
+  - {id: literature,      required: true}
+  - {id: novelty,         required: true}
+  - {id: experiment_plan, required: false}
+  - {id: experiments,     required: false}
+  - {id: draft,           required: true}
+  - {id: review,          required: true}
+  - {id: assembly,        required: true}

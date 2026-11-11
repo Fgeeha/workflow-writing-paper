@@ -12,6 +12,7 @@ from typing import Any
 
 import yaml
 
+from ..library import Library
 from .artifact import Artifact
 from .workspace import Workspace
 
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 REGISTRY_RULE = "цитируемы только поля value; note — пояснение, числа из него в текст не переносятся"
 
 # Стадия → артефакт, который она производит. experiments пишет в реестр, assembly — paper.md.
-STAGE_ARTIFACT = {"novelty": "novelty", "literature": "literature", "experiment_plan": "experiment_plan",
+STAGE_ARTIFACT = {"collect": "corpus", "novelty": "novelty", "literature": "literature", "experiment_plan": "experiment_plan",
                   "draft": "draft", "review": "draft", "assembly": "paper"}
 
 
@@ -52,7 +53,7 @@ class Project:
         manifest = {"name": slug, "title": "", "language": language, "template": template, "journal": journal,
                     "chapter": None, "budget": {"tokens": 5_000_000, "usd": 20},
                     "review": {"judges": 2, "threshold": None, "auto_iterations": 2}, "roles": {},
-                    "stages": tpl.get("stages") or [], "scenarios": []}
+                    "stages": tpl.get("stages") or [], "scenarios": [], "library": tpl.get("library", "workspace")}
         for sub in ("artifacts/history", "artifacts/reviews", "calls", "style/samples"):
             (root / sub).mkdir(parents=True, exist_ok=True)
         (root / "paper-workflow.yaml").write_text(yaml.safe_dump(manifest, allow_unicode=True, sort_keys=False),
@@ -207,6 +208,12 @@ class Project:
                     raise ValueError(f"стадия {stage_id} обязательна, пропустить нельзя")
                 st["skipped"] = reason
         self.save_manifest()
+
+    # --- библиотека ----------------------------------------------------------------------------
+    def library(self) -> Library:
+        """Своя библиотека проекта (`library: project`, шаблон explore) или общая библиотека workspace."""
+        own = self.manifest.get("library") == "project"
+        return Library(self.path / "library" if own else self.ws.root / "library")
 
     # --- журнал, реестр, профиль --------------------------------------------------------------
     def review_settings(self) -> dict[str, Any]:

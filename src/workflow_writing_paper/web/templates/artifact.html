@@ -15,9 +15,21 @@
   <button name="decision" value="reject">отклонить</button>
   <input name="reason" placeholder="причина (обязательна для override)" size="40">
 </form>
-<form method="post" action="/projects/{{ project.slug }}/artifacts/{{ art.type }}/review"><button>перепроверить судьями</button></form>
+{% if art.type != 'corpus' %}<form method="post" action="/projects/{{ project.slug }}/artifacts/{{ art.type }}/review"><button>перепроверить судьями</button></form>{% endif %}
 {% endif %}
-{% if art.status == 'approved' and art.version == current.version %}
+{% if art.type == 'corpus' %}
+<h2>Корпус: {{ (art.meta.works or [])|length }} работ</h2>
+<p class="muted">Одобрите корпус целиком или вычеркните лишнее. Работы пришли из OpenAlex; оценка релевантности — модели по аннотации.</p>
+<table>
+  <tr><th>ключ</th><th>работа</th><th>год</th><th>цит.</th><th>оценка</th><th>текст</th><th>почему</th><th></th></tr>
+  {% for w in art.meta.works or [] %}
+  <tr><td>{{ w.key }}</td><td>{% if w.id.startswith('https://openalex.org/') %}<a href="{{ w.id }}" rel="noopener noreferrer" target="_blank">{{ w.title }}</a>{% else %}{{ w.title }}{% endif %}</td><td>{{ w.year }}</td><td>{{ w.cited_by }}</td>
+    <td>{{ w.score }}</td><td>{{ 'PDF' if w.pdf else 'аннотация' if w.abstract else '—' }}</td><td class="muted">{{ w.reason }}</td>
+    <td>{% if art.status != 'approved' and art.version == current.version %}<form method="post" action="/projects/{{ project.slug }}/corpus/exclude/{{ w.key }}"><button>вычеркнуть</button></form>{% endif %}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% if art.status == 'approved' and art.version == current.version and art.type != 'corpus' %}
 <form method="post" action="/projects/{{ project.slug }}/artifacts/{{ art.type }}/to-eval"><button>в эталоны стенда</button></form>
 {% endif %}
 

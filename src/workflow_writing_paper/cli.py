@@ -80,6 +80,11 @@ def cmd_run(ws: Workspace, args: argparse.Namespace) -> int:
     if res["error"]:
         print(f"задача {tid}: ошибка: {res['error']}", file=sys.stderr)
         return 1
+    if args.stage == "collect":
+        print(f"задача {tid}: запросы: {'; '.join(res['queries'])}\nнайдено {res['found']}, в корпусе {res['selected']}, "
+              f"полных текстов {res['pdf']}, не оценено моделью {res['unscored']}. Корпус ждёт решения: wwp serve → проект → corpus, "
+              "одобрить или вычеркнуть лишнее.")
+        return 0
     if args.stage == "experiments":
         print(f"задача {tid}: сценарий {res['scenario']} → реестр: "
               + ", ".join(f"{k}={res['values'][k]:g}" for k in res["written"]) + f"; журнал runs/{res['run_dir']}")
@@ -205,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
     run = sub.add_parser("run", help="выполнить стадию проекта (синхронно, без сервера)")
     run.add_argument("slug")
     run.add_argument("stage")
-    run.add_argument("--input", help="абзац новизны для стадии novelty")
+    run.add_argument("--input", help="novelty: абзац новизны; collect: тема исследования")
     run.add_argument("--section", help="раздел для стадии draft")
     run.add_argument("--scenario", help="id сценария для стадии experiments (если в манифесте не один)")
     run.add_argument("--force", action="store_true", help="experiments: перезаписать расходящиеся значения реестра")

@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS suggestions (
 );
 """
 CHUNK, OVERLAP = 1000, 200
+PDF_TIMEOUT = 120  # секунд на извлечение текста одного PDF
 _DOI_IN_TEXT = re.compile(r"\b(10\.\d{4,9}/[^\s\"<>]+)")
 _FTS_TOKEN = re.compile(r"\w+", re.UNICODE)
 
@@ -45,7 +46,7 @@ def is_stub(e: Entry) -> bool:
 
 
 class Library:
-    """Каталог `workspace/library`: refs.bib, pdf/, index.sqlite."""
+    """Каталог библиотеки (`workspace/library` или `<проект>/library`): refs.bib, pdf/, index.sqlite."""
 
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
@@ -102,12 +103,23 @@ class Library:
             f.write(("\n" if self.bib_path.stat().st_size else "") + e.dump())
 
     def _index_entry(self, e: Entry, pdf: str | None = None, text: str = "") -> None:
+        """Строка refs и фрагменты FTS5: текст PDF, а без него — аннотация записи (has_text — только PDF)."""
+        indexed = text or e.fields.get("abstract", "")
         with self.db() as db:
             db.execute("INSERT OR REPLACE INTO refs(key, type, title, authors, year, doi, pdf, has_text) "
                        "VALUES (?,?,?,?,?,?,?,?)", (e.key, e.type, e.title, e.authors, e.year, e.doi, pdf, bool(text)))
             db.execute("DELETE FROM chunks WHERE key = ?", (e.key,))
-            for piece in _chunks(text) or [""]:
+            for piece in _chunks(indexed) or [""]:
                 db.execute("INSERT INTO chunks(key, title, text) VALUES (?,?,?)", (e.key, e.title, piece))
+
+    def attach_pdf(self, key: str, path: Path) -> bool:
+        """Проиндексировать PDF, уже лежащий в pdf/, как полный текст записи `key`; False — текст не извлечён."""
+        entry = next((e for e in self.entries() if e.key == key), None)
+        if entry is None:
+            raise LibraryError(f"записи {key} нет")
+        text = pdf_text(path)
+        self._index_entry(entry, pdf=path.name, text=text)
+        return bool(text)
 
     def remove(self, key: str) -> None:
         """Убрать запись из refs.bib (вырезается её исходный текст, остальное не трогается) и из индекса."""
@@ -284,7 +296,12 @@ def pdf_text(path: Path) -> str:
     if not shutil.which("pdftotext"):
         logger.warning("pdftotext не найден; текст %s не извлечён", path.name)
         return ""
-    proc = subprocess.run(["pdftotext", "-enc", "UTF-8", str(path), "-"], check=False, capture_output=True, text=True)
+    try:  # PDF может прийти из сети: зависший разбор не должен держать воркер
+        proc = subprocess.run(["pdftotext", "-enc", "UTF-8", str(path), "-"], check=False, capture_output=True,
+                              text=True, timeout=PDF_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        logger.warning("pdftotext %s: дольше %s с", path.name, PDF_TIMEOUT)
+        return ""
     if proc.returncode:
         logger.warning("pdftotext %s: %s", path.name, proc.stderr.strip()[-200:])
         return ""

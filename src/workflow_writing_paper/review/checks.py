@@ -7,7 +7,6 @@ from typing import Any
 
 from ..core.artifact import Artifact
 from ..core.project import Project
-from ..library import Library
 from ..registry import check_numbers, strip_code
 from .rubric import LANGUAGE_MIN_SHARE, language_share, stems
 
@@ -131,7 +130,7 @@ def deterministic_checks(project: Project, art: Artifact, rubric: str) -> list[d
 
     if art.type in CITED_TYPES:
         cited = citation_keys(body)
-        lib = Library(project.ws.root / "library")
+        lib = project.library()
         citable, all_keys = lib.citable_keys(), lib.keys()
         for key, lineno in cited.items():
             if key in citable:

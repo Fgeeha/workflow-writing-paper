@@ -180,6 +180,17 @@ def register(app: FastAPI, ws: Workspace, render: Render) -> None:
             raise HTTPException(400, str(e)) from e
         return RedirectResponse(f"/projects/{slug}/artifacts/{type_}", status_code=303)
 
+    @app.post("/projects/{slug}/corpus/exclude/{key}")
+    def corpus_exclude(slug: str, key: str) -> RedirectResponse:
+        """Вычеркнуть работу из собранного корпуса до его одобрения."""
+        from ..roles.collect import exclude
+
+        try:
+            exclude(_open(ws, slug), key)
+        except ValueError as e:
+            raise HTTPException(400, str(e)) from e
+        return RedirectResponse(f"/projects/{slug}/artifacts/corpus", status_code=303)
+
     @app.post("/projects/{slug}/artifacts/{type_}/review")
     def rereview(slug: str, type_: str) -> RedirectResponse:
         try:
