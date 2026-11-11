@@ -169,7 +169,10 @@ class Project:
         if not (self.path / ".git").exists() or not shutil.which("git"):
             return
         _git(self.path, "add", "-A")
-        _git(self.path, "commit", "-q", "-m", message)
+        named = subprocess.run(["git", "config", "user.email"], cwd=self.path, check=False, capture_output=True,
+                               text=True).stdout.strip()
+        who = [] if named else ["-c", "user.name=wwp", "-c", "user.email=wwp@localhost"]  # git без имени не коммитит
+        _git(self.path, *who, "commit", "-q", "-m", message)
 
     # --- стадии ----------------------------------------------------------------------------
     def stages(self) -> list[dict[str, Any]]:
