@@ -2,17 +2,17 @@
 {% block title %}{{ project.slug }} · {{ art.type }} v{{ art.version }}{% endblock %}
 {% block content %}
 <p><a href="/projects/{{ project.slug }}">← {{ project.slug }}</a></p>
-<h1>{{ art.type }} v{{ art.version }} <span class="{{ 'ok' if art.status == 'approved' else 'bad' if art.status in ('rejected','stale') else 'muted' }}">{{ art.status }}</span></h1>
+<h1>{{ art.type }} v{{ art.version }} <span class="badge badge-{{ art.status }}">{{ art.status }}</span></h1>
 <p class="muted">Автор: {{ art.meta.created_by.role }} · {{ art.meta.created_by.provider }} ({{ art.meta.created_by.family }}).
   Версии: {% for v in versions %}<a href="?version={{ v }}">{% if v == art.version %}<b>v{{ v }}</b>{% else %}v{{ v }}{% endif %}</a> {% endfor %}
   {% if art.meta.approved_at %}· одобрен {{ art.meta.approved_at }}{% if art.meta.override_reason %} (override: {{ art.meta.override_reason }}){% endif %}{% endif %}</p>
 
 {% if art.version == current.version and art.status in ('in_review', 'draft', 'stale') %}
 <form method="post" action="/projects/{{ project.slug }}/artifacts/{{ art.type }}/decide" class="rec">
-  <button name="decision" value="approve">одобрить</button>
+  <button class="primary" name="decision" value="approve">одобрить</button>
   <button name="decision" value="override">одобрить с override</button>
   <button name="decision" value="return">вернуть на правку</button>
-  <button name="decision" value="reject">отклонить</button>
+  <button class="danger" name="decision" value="reject">отклонить</button>
   <input name="reason" placeholder="причина (обязательна для override)" size="40">
 </form>
 {% if art.type != 'corpus' %}<form method="post" action="/projects/{{ project.slug }}/artifacts/{{ art.type }}/review"><button>перепроверить судьями</button></form>{% endif %}
@@ -31,7 +31,7 @@
   {% for w in art.meta.works or [] %}
   <tr><td>{{ w.key }}</td><td>{% if w.id.startswith('https://openalex.org/') %}<a href="{{ w.id }}" rel="noopener noreferrer" target="_blank">{{ w.title }}</a>{% else %}{{ w.title }}{% endif %}</td><td>{{ w.year }}</td><td>{{ w.cited_by }}</td>
     <td>{{ w.score }}</td><td>{{ 'PDF' if w.pdf else 'аннотация' if w.abstract else '—' }}</td><td class="muted">{{ w.reason }}</td>
-    <td>{% if art.status != 'approved' and art.version == current.version %}<form method="post" action="/projects/{{ project.slug }}/corpus/exclude/{{ w.key }}"><button>вычеркнуть</button></form>{% endif %}</td></tr>
+    <td>{% if art.status != 'approved' and art.version == current.version %}<form method="post" action="/projects/{{ project.slug }}/corpus/exclude/{{ w.key }}"><button class="danger">вычеркнуть</button></form>{% endif %}</td></tr>
   {% endfor %}
 </table>
 {% endif %}

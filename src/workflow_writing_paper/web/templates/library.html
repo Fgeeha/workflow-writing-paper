@@ -5,15 +5,15 @@
 <p class="muted">{{ bib }} — единственный источник ключей цитирования: в артефактах допустимы только <code>[@ключ]</code> из него.
   Текст PDF извлекается pdftotext и индексируется FTS5.</p>
 
-<form method="post" action="/library/import" enctype="multipart/form-data">
+<form method="post" action="/library/import" enctype="multipart/form-data" class="field-row">
   <input type="file" name="files" multiple accept=".bib,.pdf">
   или путь к файлу/папке на сервере <input name="path" size="40" placeholder="/home/me/papers">
-  <button>импортировать</button>
+  <button class="primary">импортировать</button>
 </form>
-<form method="get" action="/library" style="margin-top:.6rem">
+<form method="get" action="/library" class="field-row">
   поиск по библиотеке <input name="q" value="{{ q }}" size="40" placeholder="слова через пробел"> <button>найти</button>
 </form>
-<form method="post" action="/library/openalex" style="margin-top:.6rem">
+<form method="post" action="/library/openalex" class="field-row">
   поиск в OpenAlex <input name="q" size="40" placeholder="название или тема"> <button>искать</button>
   <span class="muted">находки появятся ниже как предложения</span>
 </form>
@@ -38,7 +38,7 @@
       <td class="muted">{{ s.doi }}</td><td class="muted">{{ s.project or '' }}</td>
       <td style="white-space:nowrap">
         <form method="post" action="/library/suggestions/{{ s.id }}/accept" style="display:inline"><button>добавить</button></form>
-        <form method="post" action="/library/suggestions/{{ s.id }}/reject" style="display:inline"><button>отклонить</button></form>
+        <form method="post" action="/library/suggestions/{{ s.id }}/reject" style="display:inline"><button class="danger">отклонить</button></form>
       </td></tr>
   {% endfor %}
 </table>
@@ -54,7 +54,7 @@
       <td class="muted">{{ r.doi or '' }}</td>
       <td>{% if r.pdf %}{{ r.pdf }}{% if not r.has_text %} <span class="bad">без текста</span>{% endif %}{% endif %}</td>
       <td class="muted">{{ r.added_at }}</td>
-      <td><form method="post" action="/library/remove/{{ r.key }}" onsubmit="return confirm('Убрать {{ r.key }} из refs.bib?')"><button>убрать</button></form></td></tr>
+      <td><form method="post" action="/library/remove/{{ r.key }}" onsubmit="return confirm('Убрать {{ r.key }} из refs.bib?')"><button class="danger">убрать</button></form></td></tr>
   {% else %}<tr><td colspan="7" class="muted">Пусто. Импортируйте .bib или PDF.</td></tr>{% endfor %}
 </table>
 <form method="post" action="/library/reindex"><button>пересобрать индекс</button>

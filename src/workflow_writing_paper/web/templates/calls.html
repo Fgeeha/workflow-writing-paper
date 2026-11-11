@@ -3,7 +3,7 @@
 {% block content %}
 <h1>Журнал вызовов</h1>
 <p class="muted">Всего: {{ totals.n }} вызовов, токены {{ totals.tin or 0 }} / {{ totals.tout or 0 }}, ${{ '%.4f'|format(totals.usd or 0) }}.</p>
-<form method="get">
+<form method="get" class="field-row">
   роль <input name="role" value="{{ role }}" size="12">
   провайдер <input name="provider" value="{{ provider }}" size="20">
   <button>Фильтр</button>

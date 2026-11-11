@@ -1,10 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ project.slug }}{% endblock %}
 {% block content %}
+<div class="hero">
 <h1>{{ project.slug }}{% if project.manifest.title %} — {{ project.manifest.title }}{% endif %}</h1>
 <p class="muted">{{ project.path }} · шаблон {{ project.manifest.template }} · журнал {{ project.manifest.journal }} · язык {{ project.language }}
   · <a href="/projects/{{ project.slug }}/registry">реестр результатов</a> · <a href="/library">библиотека</a></p>
 <p>Бюджет: токены {{ spent.tokens|int }} / {{ budget.tokens }}, ${{ '%.3f'|format(spent.usd) }} / {{ budget.usd }}</p>
+</div>
 
 <h2>Стадии</h2>
 <table>
@@ -13,7 +15,7 @@
   <tr>
     <td>{{ s.id }}</td><td>{{ 'да' if s.required else 'нет' }}</td>
     <td class="{{ 'ok' if s.state in ('done','skipped') else 'bad' if s.state == 'stale' else '' }}">{{ s.state }}{% if s.skipped %} <span class="muted">({{ s.skipped }})</span>{% endif %}</td>
-    <td>{% if s.artifact %}<a href="/projects/{{ project.slug }}/artifacts/{{ s.artifact.type }}">{{ s.artifact.type }} v{{ s.artifact.version }} · {{ s.artifact.status }}</a>{% endif %}</td>
+    <td>{% if s.artifact %}<a href="/projects/{{ project.slug }}/artifacts/{{ s.artifact.type }}">{{ s.artifact.type }} v{{ s.artifact.version }}</a> <span class="badge badge-{{ s.artifact.status }}">{{ s.artifact.status }}</span>{% endif %}</td>
     <td>
       {% if s.not_yet %}<span class="muted">появится в {{ s.not_yet }}</span>
         {% if not s.skipped %}<form method="post" action="/projects/{{ project.slug }}/skip/{{ s.id }}" style="display:inline"> <input name="reason" placeholder="причина пропуска" size="18"><button>пропустить</button></form>{% endif %}
@@ -21,15 +23,15 @@
       {% elif s.id == 'collect' %}
         <form method="post" action="/projects/{{ project.slug }}/run/collect">
           <textarea name="input" rows="3" cols="60" placeholder="Тема: что изучаем, какая задача, какие методы интересны (пусто — пересобрать по прежней теме)"></textarea>
-          <button>собрать литературу</button></form>
+          <button class="primary">собрать литературу</button></form>
       {% elif s.id == 'novelty' %}
         <form method="post" action="/projects/{{ project.slug }}/run/novelty">
           <textarea name="input" rows="3" cols="60" placeholder="{{ 'Абзац новизны от автора (пусто — вывести из обзора по теме корпуса)' if project.manifest.library == 'project' else 'Абзац новизны от автора (пусто — переработать текущую версию)' }}"></textarea>
-          {% include "ab_select.html" %}<button>запустить</button></form>
+          {% include "ab_select.html" %}<button class="primary">запустить</button></form>
       {% elif s.id in ('literature', 'experiment_plan') %}
         <form method="post" action="/projects/{{ project.slug }}/run/{{ s.id }}">
           <textarea name="input" rows="2" cols="60" placeholder="{{ 'Указания автору обзора: ключевые слова, что искать (необязательно)' if s.id == 'literature' else 'Ресурсы, данные, ограничения для планировщика (необязательно)' }}"></textarea>
-          {% include "ab_select.html" %}<button>запустить</button></form>
+          {% include "ab_select.html" %}<button class="primary">запустить</button></form>
         {% if not s.required and not s.skipped %}<form method="post" action="/projects/{{ project.slug }}/skip/{{ s.id }}" style="display:inline"><input name="reason" placeholder="причина" size="12"><button>пропустить</button></form>{% endif %}
       {% elif s.id == 'experiments' %}
         <a href="/projects/{{ project.slug }}/registry">сценарии и запуск — в реестре</a>
@@ -37,9 +39,9 @@
       {% elif s.id == 'draft' %}
         <form method="post" action="/projects/{{ project.slug }}/run/draft">
           <select name="section">{% for sec in sections %}<option value="{{ sec.name }}">{{ sec.name }}{% if sec.written %} ✓{% endif %}</option>{% endfor %}</select>
-          {% include "ab_select.html" %}<button>написать раздел</button></form>
+          {% include "ab_select.html" %}<button class="primary">написать раздел</button></form>
       {% else %}
-        <form method="post" action="/projects/{{ project.slug }}/run/{{ s.id }}" style="display:inline"><button>запустить</button></form>
+        <form method="post" action="/projects/{{ project.slug }}/run/{{ s.id }}" style="display:inline"><button class="primary">запустить</button></form>
         {% if not s.required and not s.skipped %}<form method="post" action="/projects/{{ project.slug }}/skip/{{ s.id }}" style="display:inline"><input name="reason" placeholder="причина" size="12"><button>пропустить</button></form>{% endif %}
       {% endif %}
     </td>
