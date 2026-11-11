@@ -345,3 +345,15 @@ def test_start_from_scratch_creates_explore_project_and_queues_collect(tmp_path)
     with ws.db() as db:
         task = db.execute("SELECT stage, payload, status FROM tasks WHERE project = ?", (project.slug,)).fetchone()
     assert task["stage"] == "collect" and task["status"] == "queued" and topic in json.loads(task["payload"])["input"]
+
+
+def test_htmx_served_locally(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from workflow_writing_paper.web import create_app
+
+    ws, _ = make(tmp_path)
+    client = TestClient(create_app(ws, worker=False))
+    assert 'src="/static/htmx.min.js"' in client.get("/").text
+    r = client.get("/static/htmx.min.js")
+    assert r.status_code == 200 and r.text.startswith("var htmx")

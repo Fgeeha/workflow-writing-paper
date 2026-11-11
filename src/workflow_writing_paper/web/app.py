@@ -12,6 +12,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from ..core import Workspace
@@ -30,6 +31,7 @@ def create_app(ws: Workspace | None = None, worker: bool = True) -> FastAPI:
     app = FastAPI(title="workflow-writing-paper")
     if worker:
         Worker(ws).start()
+    app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")  # htmx — офлайн
     templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
     jobs: dict[str, dict[str, Any]] = {}
 

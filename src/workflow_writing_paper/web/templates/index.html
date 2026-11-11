@@ -22,7 +22,7 @@
 <h2>Артефакты на одобрении</h2>
 {% if pending %}
 <table>
-  <tr><th>проект</th><th>артефакт</th><th>версия</th><th>судьи</th><th>блокеры</th><th></th></tr>
+  <tr><th>проект</th><th>артефакт</th><th class="num">версия</th><th class="num">судьи</th><th class="num">блокеры</th><th></th></tr>
   {% for p in pending %}
   <tr>
     <td><a href="/projects/{{ p.slug }}">{{ p.slug }}</a></td><td>{{ p.type }}</td><td class="num">v{{ p.version }}</td>
