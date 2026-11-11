@@ -71,6 +71,18 @@ def run_pending(ws: Workspace) -> int:
     return len(ids)
 
 
+def recover_interrupted(ws: Workspace) -> int:
+    """Задачи в статусе running при старте сервера прерваны его остановкой: помечаются failed.
+
+    Сделанное до остановки остаётся в версиях артефактов; повтор — вручную, чтобы не тратить вызовы без автора.
+    """
+    with closing(ws.db()) as db:
+        cur = db.execute("UPDATE tasks SET status='failed', finished_at=datetime('now'), error=? WHERE status='running'",
+                         ("прервано остановкой сервера — запустите стадию снова",))
+        db.commit()
+        return cur.rowcount
+
+
 class Worker(threading.Thread):
     """Поток в процессе сервера: раз в секунду раздаёт задачи очереди пулу.
 
@@ -107,6 +119,7 @@ class Worker(threading.Thread):
                 self._busy.discard(project)
 
     def run(self) -> None:
+        recover_interrupted(self.ws)
         parallel = max(1, int((self.ws.config().get("worker") or {}).get("parallel", 2)))
         with ThreadPoolExecutor(parallel, thread_name_prefix="wwp-task") as pool:
             while not self._stop.is_set():

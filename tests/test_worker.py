@@ -50,3 +50,15 @@ def test_run_task_claims_once(tmp_path):
     tid = enqueue(ws, "demo", "novelty", {"input": "x"})
     assert engine.run_task(ws, tid)["error"] is None
     assert "уже done" in engine.run_task(ws, tid)["error"]  # повторный захват той же задачи
+
+
+def test_interrupted_running_task_marked_failed(tmp_path):
+    ws, _ = make(tmp_path)
+    tid = enqueue(ws, "demo", "novelty", {"input": "x"})
+    with ws.db() as db:
+        db.execute("UPDATE tasks SET status='running' WHERE id=?", (tid,))
+    assert engine.recover_interrupted(ws) == 1
+    with ws.db() as db:
+        row = db.execute("SELECT status, error FROM tasks WHERE id=?", (tid,)).fetchone()
+    assert row["status"] == "failed" and "прервано" in row["error"]
+    assert engine.recover_interrupted(ws) == 0
