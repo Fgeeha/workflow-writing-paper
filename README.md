@@ -123,7 +123,8 @@ uv run wwp decide leaves experiment_plan approve
 ```
 
 Если судьи нашли блокеры, команда их напечатает, а артефакт останется «на проверке». Варианты: исправить
-`artifacts/<артефакт>.md` вручную и перепроверить (`wwp review leaves literature`), перезапустить стадию с
+`artifacts/<артефакт>.md` вручную (в вебе — «Редактировать текст» на странице артефакта: сохранение
+создаёт новую версию от `human`) и перепроверить (`wwp review leaves literature`), перезапустить стадию с
 указаниями (`--input "что учесть"`) или одобрить с обоснованием
 (`wwp decide leaves literature override --reason "почему блокер не важен"`). Пока блокеры есть, `approve`
 отказывает — и в CLI, и в вебе (там остаётся только кнопка override). Заголовок статьи берётся из темы
@@ -232,7 +233,7 @@ qwen3:14b (ниже gemma4 и вдвое медленнее).
 ## Справочник команд
 
 ```bash
-uv run wwp init | serve [--port 8765] | profile <имя>
+uv run wwp init | serve [--host 0.0.0.0] [--port 8765] | profile <имя>   # --host 0.0.0.0 — доступ из сети, без пароля
 uv run wwp new <slug> --template experimental|explore|survey|theoretical [--journal id] [--language ru|en]
 uv run wwp run <slug> <стадия> [--input …] [--section …] [--scenario id] [--force] [--ab provider]
 uv run wwp decide <slug> <артефакт> approve|override|return|reject|a|b [--reason …]
@@ -293,7 +294,7 @@ JSON/CSV по `mapping` ложатся в `results.json` с seed, хэшем к�
 | v0.3 | библиотека: PDF, BibTeX, FTS5, OpenAlex; стадии `literature`, `experiment_plan`; проверка ключей `[@key]` |
 | v0.4 | запуск зарегистрированных сценариев экспериментов, локально и по SSH; парсер JSON/CSV по `mapping`; конфликты реестра |
 | v0.5 | автосбор литературы по теме (шаблон `explore`: сбор → одобрение корпуса → обзор → новизна из пробелов); лимиты журнала и перекрёстные ссылки в черновике; совпавшие блокеры судей первыми; `export`, `reindex`, `gc`, `decide`; эталоны для трёх новых ролей; живой сквозной путь до `paper.docx` на локальных моделях |
-| v0.6 (в работе) | живые A/B моделей с выбором автора; параллельные воркер и судьи; `docker compose`; образец профиля журнала |
+| v0.6 (в работе) | живые A/B моделей с выбором автора; ручная правка артефактов в вебе; параллельные воркер и судьи; `docker compose`; образец профиля журнала |
 
 </details>
 
