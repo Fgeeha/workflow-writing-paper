@@ -10,6 +10,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from ..core.labels import ru
 from ..core.project import Project
 from ..experiments import ExperimentError, run_scenario
 from ..library import Library
@@ -367,7 +368,7 @@ NOT_YET: dict[str, str] = {}  # стадии, ещё не реализованн
 
 def run_stage(project: Project, stage: str, payload: dict[str, Any], task: str | None = None) -> dict[str, Any]:
     if stage in NOT_YET:
-        raise StageError(f"стадия {stage} появится в {NOT_YET[stage]}; пока её можно пропустить с указанием причины")
+        raise StageError(f"стадия «{ru(stage)}» появится в {NOT_YET[stage]}; пока её можно пропустить с указанием причины")
     if stage not in STAGES:
         raise StageError(f"неизвестная стадия {stage}")
     if payload.get("ab"):  # живое A/B: та же стадия второй моделью, выбор за автором

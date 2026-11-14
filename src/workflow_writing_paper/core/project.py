@@ -14,6 +14,7 @@ import yaml
 
 from ..library import Library
 from .artifact import Artifact
+from .labels import ru
 from .workspace import Workspace
 
 logger = logging.getLogger(__name__)
@@ -155,7 +156,7 @@ class Project:
             raise ValueError("сначала выбор A/B: какая из двух версий остаётся")
         blockers = int((art.meta.get("review_summary") or {}).get("blockers") or 0)
         if decision == "approve" and blockers:
-            raise ValueError(f"{type_} v{art.version}: блокеров {blockers} — исправьте и перепроверьте "
+            raise ValueError(f"{ru(type_)} v{art.version}: блокеров {blockers} — исправьте и перепроверьте "
                              "или одобрите через override с причиной")
         if decision in ("approve", "override"):
             art.status = "approved"
@@ -215,7 +216,7 @@ class Project:
                 return True, ""
             state = self.stage_state(st["id"])
             if st.get("required", True) and state not in ("done", "skipped", "complete"):
-                return False, f"стадия {st['id']} не завершена ({state})"
+                return False, f"стадия «{ru(st['id'])}» не завершена ({ru(state)})"
         return False, f"стадии {stage_id} нет в манифесте"
 
     def skip_stage(self, stage_id: str, reason: str) -> None:
@@ -223,7 +224,7 @@ class Project:
         for st in self.manifest.get("stages") or []:
             if st["id"] == stage_id:
                 if st.get("required", True):
-                    raise ValueError(f"стадия {stage_id} обязательна, пропустить нельзя")
+                    raise ValueError(f"стадия «{ru(stage_id)}» обязательна, пропустить нельзя")
                 st["skipped"] = reason
         self.save_manifest()
 

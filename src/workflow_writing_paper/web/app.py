@@ -17,9 +17,9 @@ from fastapi.templating import Jinja2Templates
 
 from ..core import Workspace
 from ..core.engine import Worker
+from ..core.labels import ru
 from ..eval import run_bench, summary
 from ..providers import build_pool, role_providers
-from .labels import ru
 from .library import register_library
 from .projects import register
 

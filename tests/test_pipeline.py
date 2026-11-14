@@ -60,7 +60,7 @@ def test_end_to_end_novelty_then_draft(tmp_path):
         enqueue(ws, "demo", "draft", {"section": "Эксперимент"})
         raise AssertionError("гейт не сработал")
     except ValueError as e:
-        assert "novelty" in str(e)
+        assert "«новизна» не завершена" in str(e)
 
     tid = enqueue(ws, "demo", "novelty", {"input": "Мы ускорили инференс на одноплатном компьютере."})
     assert run_pending(ws) == 1
@@ -167,7 +167,7 @@ def test_web_pages_end_to_end(tmp_path):
                                        "language": "ru"}, follow_redirects=False)
     assert r.status_code == 303
     page = client.get("/projects/web-demo").text
-    assert "novelty" in page and "pending" in page
+    assert "novelty" in page and "«новизна» не завершена (не начата)" in page
     assert "<td>новизна</td>" in page and "не начата" in page  # подписи стадий и состояний — по-русски
     r = client.post("/projects/web-demo/run/novelty", data={"input": "Идея."}, follow_redirects=False)
     assert r.status_code == 303 and run_pending(ws) == 1
