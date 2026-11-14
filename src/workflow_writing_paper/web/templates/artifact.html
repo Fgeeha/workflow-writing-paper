@@ -9,8 +9,13 @@
 
 {% if art.version == current.version and art.status in ('in_review', 'draft', 'stale') %}
 <form method="post" action="/projects/{{ project.slug }}/artifacts/{{ art.type }}/decide" class="rec">
+  {% if (art.meta.review_summary or {}).blockers %}
+  <span class="badge badge-rejected">блокеров: {{ art.meta.review_summary.blockers }}</span>
+  <button class="primary" name="decision" value="override">одобрить с override</button>
+  {% else %}
   <button class="primary" name="decision" value="approve">одобрить</button>
   <button name="decision" value="override">одобрить с override</button>
+  {% endif %}
   <button name="decision" value="return">вернуть на правку</button>
   <button class="danger" name="decision" value="reject">отклонить</button>
   <input name="reason" placeholder="причина (обязательна для override)" size="40">

@@ -58,6 +58,7 @@ def cmd_new(ws: Workspace, args: argparse.Namespace) -> int:
 
     project = Project.create(ws, args.slug, template=args.template, path=args.path, language=args.language,
                              journal=args.journal)
+    project.set_title_from(args.title or "")
     print(f"проект {project.slug}: {project.path}")
     return 0
 
@@ -240,6 +241,7 @@ def main(argv: list[str] | None = None) -> int:
     bench.add_argument("--judges", type=int, default=2, help="число судей других семейств")
     new = sub.add_parser("new", help="создать проект-статью")
     new.add_argument("slug")
+    new.add_argument("--title", help="заголовок статьи; по умолчанию — тема из collect")
     new.add_argument("--template", default="experimental")
     new.add_argument("--journal", default="generic")
     new.add_argument("--language", default="ru")

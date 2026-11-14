@@ -69,7 +69,7 @@ def _low_score_notes(result: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _review_loop(project: Project, type_: str, task: str | None,
-                 revise: Callable[[list[dict[str, Any]]], None]) -> dict[str, Any]:
+                 revise: Callable[[list[dict[str, Any]]], bool]) -> dict[str, Any]:
     """Проверка; при блокерах — до auto_iterations правок ролью-автором, дальше человек."""
     limit = int(project.review_settings()["auto_iterations"])
     try:
@@ -77,7 +77,8 @@ def _review_loop(project: Project, type_: str, task: str | None,
         for _ in range(limit):
             if result["accepted"] or (result["errors"] and not result["blockers"]):
                 break  # принято — или судей не хватило: правка текста это не исправит
-            revise(result["blockers"] or _low_score_notes(result))
+            if not revise(result["blockers"] or _low_score_notes(result)):
+                break  # правка отброшена — перепроверять ту же версию незачем
             result = review_artifact(project, type_, task)
     except ReviewError as e:
         raise StageError(str(e)) from e
@@ -95,15 +96,28 @@ def _author_critic_author(project: Project, role: str, base: str, task: str | No
 
 
 def _reviser(project: Project, type_: str, role: str, base: str, task: str | None,
-             max_tokens: int = 4000) -> Callable[[list[dict[str, Any]]], None]:
-    """Правка артефакта ролью-автором по блокерам проверки — шаг цикла `_review_loop`."""
-    def revise(blockers: list[dict[str, Any]]) -> None:
+             max_tokens: int = 4000) -> Callable[[list[dict[str, Any]]], bool]:
+    """Правка артефакта ролью-автором по блокерам проверки — шаг цикла `_review_loop`; False — правка отброшена."""
+    def revise(blockers: list[dict[str, Any]]) -> bool:
         cur = project.artifact(type_)
-        fixed, p = call_role(project, role, f"{base}\n\n## Текущая версия\n{cur.body if cur else ''}\n\n"
-                             f"## Блокеры проверки\n{_blockers_text(blockers)}\n\nИсправь все блокеры, остальное сохрани.",
+        old = cur.body if cur else ""
+        fixed, p = call_role(project, role, f"{base}\n\n## Текущая версия\n{old}\n\n"
+                             f"## Блокеры проверки\n{_blockers_text(blockers)}\n\nИсправь все блокеры, остальное сохрани. "
+                             "Ответ — полный исправленный документ целиком, а не список замен или инструкций по правке.",
                              task, max_tokens)
-        project.write_artifact(type_, fixed.text, _created_by(role, p, fixed))
+        if not truncated_revision(old, fixed.text):
+            project.write_artifact(type_, fixed.text, _created_by(role, p, fixed))
+            return True
+        logger.warning("%s: правка %d симв. при исходных %d — похоже на список замен, версия сохранена прежней",
+                       type_, len(fixed.text), len(old))
+        return False
     return revise
+
+
+def truncated_revision(old: str, new: str) -> bool:
+    """Правка вдвое короче исходника — модель вернула огрызок или «заменить X на Y», а не документ."""
+    # ponytail: порог по длине; если законные сокращения вдвое станут нормой — сравнивать заголовки разделов
+    return bool(old) and len(new.strip()) < 0.5 * len(old.strip())
 
 
 def _approved(project: Project, type_: str, title: str) -> str:
@@ -254,14 +268,19 @@ def stage_draft(project: Project, payload: dict[str, Any], task: str | None = No
     project.write_artifact("draft", merge_section(body_prev, section, text, sections),
                            _created_by("section_writer", provider, comp))
 
-    def revise(blockers: list[dict[str, Any]]) -> None:
+    def revise(blockers: list[dict[str, Any]]) -> bool:
         cur = project.artifact("draft")
         text = cur.body if cur else ""
         fixed, p = call_role(project, "section_writer", f"{ctx}\n\n## Текущий черновик\n{text}\n\n"
                              f"## Блокеры проверки\n{_blockers_text(blockers)}\n\nИсправь блокеры в разделе «{section}»"
                              " и верни только этот раздел целиком.", task, 6000)
+        old = next((m.group(0) for m in _SECTION.finditer(text) if m.group(1).strip().lower() == section.lower()), "")
+        if truncated_revision(old, fixed.text):
+            logger.warning("draft «%s»: правка вдвое короче раздела — версия сохранена прежней", section)
+            return False
         project.write_artifact("draft", merge_section(text, section, fixed.text, sections),
                                _created_by("section_writer", p, fixed))
+        return True
 
     return _review_loop(project, "draft", task, revise)
 
@@ -292,6 +311,10 @@ def stage_assembly(project: Project, payload: dict[str, Any], task: str | None =
     draft = project.artifact("draft")
     if draft is None or draft.status != "approved":
         raise StageError("черновик не одобрен")
+    holes = [f"{i}: {ln.strip()[:80]}" for i, ln in enumerate(draft.body.splitlines(), 1) if "{pending}" in ln]
+    if holes:
+        raise StageError("в черновике незаполненные места {pending} — заполните artifacts/draft.md, "
+                         "перепроверьте и одобрите заново:\n" + "\n".join(holes))
     title = project.manifest.get("title") or project.slug
     paper = f"# {title}\n\n{draft.body}"
     art = project.write_artifact("paper", paper, {"role": "assembly", "provider": "code", "family": "code"},
@@ -315,6 +338,12 @@ def export(project: Project, to: str = "docx") -> Path:
         raise StageError("pandoc не установлен")
     out = project.path / f"paper.{to}"
     cmd = ["pandoc", str(src), "-o", str(out)]
+    if to == "pdf":  # pdflatex по умолчанию не знает кириллицы
+        engine = next((e for e in ("xelatex", "lualatex") if shutil.which(e)), None)
+        if engine is None:
+            raise StageError("для PDF нужен xelatex или lualatex (texlive-xetex)")
+        font = str((project.journal().get("pdf") or {}).get("mainfont") or "DejaVu Serif")
+        cmd += [f"--pdf-engine={engine}", "-V", f"mainfont={font}", "-V", "lang=" + project.language]
     bib = project.library().bib_path
     if bib.exists():
         cmd += ["--citeproc", "--bibliography", str(bib)]

@@ -109,11 +109,9 @@ def register(app: FastAPI, ws: Workspace, render: Render) -> None:
         topic = str(form.get("topic") or "").strip()
         if len(topic) < 20:
             raise HTTPException(400, "опишите тему и проблематику хотя бы одним предложением")
-        title = str(form.get("title") or "").strip() or topic.splitlines()[0][:120]
         slug = start_slug(topic, {p["slug"] for p in _projects(ws)})
         project = Project.create(ws, slug, template="explore", language=str(form.get("language") or "ru"))
-        project.manifest["title"] = title
-        project.save_manifest()
+        project.set_title_from(str(form.get("title") or "").strip() or topic)
         enqueue(ws, slug, "collect", {"input": topic})
         return RedirectResponse(f"/projects/{slug}", status_code=303)
 

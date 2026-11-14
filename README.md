@@ -26,6 +26,7 @@ v0.6 в работе. Техническое задание — [docs/PLAN.md](d
 | git | история артефактов проекта | да |
 | [Ollama](https://ollama.com) и видеокарта 12–16 ГБ | локальные модели | да, если нет облачных |
 | pandoc | `paper.docx` / `paper.pdf` | для сборки |
+| xelatex или lualatex и шрифт DejaVu Serif (`texlive-xetex`, `fonts-dejavu`) | `paper.pdf` с кириллицей | для PDF |
 | poppler-utils (`pdftotext`) | полный текст PDF в библиотеке | для PDF |
 | `codex`, `claude`, `opencode` CLI или ключи API | облачные модели и судьи | нет |
 
@@ -91,7 +92,7 @@ uv run wwp decide leaves corpus approve
 uv run wwp run leaves literature          # обзор только по ключам корпуса, ≈ 5 мин
 uv run wwp decide leaves literature approve
 uv run wwp run leaves novelty             # новизна из пробелов обзора; «[уточнить: …]» — ваш выбор
-uv run wwp decide leaves novelty approve  # или сначала отредактируйте artifacts/novelty.md
+uv run wwp decide leaves novelty approve  # правили artifacts/novelty.md вручную — сначала wwp review leaves novelty
 uv run wwp run leaves experiment_plan     # эксперименты, метрики, ключи реестра
 uv run wwp decide leaves experiment_plan approve
 ```
@@ -99,7 +100,9 @@ uv run wwp decide leaves experiment_plan approve
 Если судьи нашли блокеры, команда их напечатает, а артефакт останется «на проверке». Варианты: исправить
 `artifacts/<артефакт>.md` вручную и перепроверить (`wwp review leaves literature`), перезапустить стадию с
 указаниями (`--input "что учесть"`) или одобрить с обоснованием
-(`wwp decide leaves literature override --reason "почему блокер не важен"`).
+(`wwp decide leaves literature override --reason "почему блокер не важен"`). Пока блокеры есть, `approve`
+отказывает — и в CLI, и в вебе (там остаётся только кнопка override). Заголовок статьи берётся из темы
+`collect`; задать свой — `wwp new leaves --template explore --title "…"`.
 
 Эксперимент — зарегистрированный вами сценарий; модели ничего не запускают. Пример из репозитория
 считает параметры MobileNetV2:
@@ -129,11 +132,10 @@ for s in "Введение" "Постановка задачи" "Метод" "Э
   uv run wwp run leaves draft --section "$s"              # разделы по профилю журнала, 2–5 мин на раздел
 done
 uv run wwp check leaves draft            # детерминированные проверки: числа, ссылки, лимиты журнала
-uv run wwp decide leaves draft approve
 uv run wwp run leaves review             # финальная проверка всего черновика судьями
-uv run wwp decide leaves draft approve   # review возвращает черновик на ваше решение
-uv run wwp run leaves assembly           # → workspace/projects/leaves/paper.md и paper.docx
-uv run wwp export leaves --to pdf        # PDF — если у pandoc есть LaTeX
+uv run wwp decide leaves draft approve   # при блокерах — исправить и wwp review, или override --reason
+uv run wwp run leaves assembly           # → paper.md и paper.docx; пока в черновике есть {pending}, отказ со списком строк
+uv run wwp export leaves --to pdf        # PDF через xelatex/lualatex; шрифт — pdf.mainfont в профиле журнала
 ```
 
 Разделы журнала, лимиты аннотации и объёма, минимум источников — в `workspace/journals/generic.yaml`;

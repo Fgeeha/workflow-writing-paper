@@ -148,6 +148,7 @@ def stage_collect(project: Project, payload: dict[str, Any], task: str | None = 
     topic = str(payload.get("input") or (prev.meta.get("source") if prev else "") or "").strip()
     if not topic:
         raise StageError("нужна тема исследования (payload.input): абзац о том, что изучаем")
+    project.set_title_from(topic)  # иначе заголовком paper.md станет slug
     cfg = settings(project)
     mailto = str((project.ws.config().get("library") or {}).get("mailto") or "")
 

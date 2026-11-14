@@ -357,3 +357,34 @@ def test_htmx_served_locally(tmp_path):
     assert 'src="/static/htmx.min.js"' in client.get("/").text
     r = client.get("/static/htmx.min.js")
     assert r.status_code == 200 and r.text.startswith("var htmx")
+
+
+def test_approve_blocked_by_blockers_and_pending_blocks_assembly(tmp_path):
+    from workflow_writing_paper.roles import StageError, stage_assembly, truncated_revision
+
+    _ws, project = make(tmp_path)
+    by = {"role": "section_writer", "provider": "writer", "family": "a"}
+    art = project.write_artifact("draft", "## Введение\n\nF1 = {pending}.", by)
+    art.meta["review_summary"] = {"accepted": False, "blockers": 2}
+    project.update_artifact(art)
+    try:
+        project.decide("draft", "approve")
+        raise AssertionError("approve с блокерами")
+    except ValueError as e:
+        assert "override" in str(e)
+    project.decide("draft", "override", "автор принял риск")
+    try:
+        stage_assembly(project, {})
+        raise AssertionError("assembly с {pending}")
+    except StageError as e:
+        assert "{pending}" in str(e) and "3: F1" in str(e)
+    assert truncated_revision("x" * 1000, "заменить A на B") and not truncated_revision("x" * 1000, "y" * 900)
+
+
+def test_title_from_topic_cut_at_word(tmp_path):
+    _ws, project = make(tmp_path)
+    project.set_title_from("слово " * 40 + "\nвторая строка")
+    title = project.manifest["title"]
+    assert len(title) <= 121 and title.endswith("слово…")
+    project.set_title_from("другая тема")  # уже задан — не перезаписывается
+    assert project.manifest["title"] == title

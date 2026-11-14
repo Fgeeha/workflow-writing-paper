@@ -254,7 +254,7 @@ def test_stage_literature_then_experiment_plan(tmp_path):
     assert res["error"] is None and not res["accepted"]
     assert all("fake2099" in b["issue"] for b in res["blockers"]) and project.artifact("literature").version == 4
 
-    project.decide("literature", "approve")
+    project.decide("literature", "override", "тест: блокер принят автором")
     res = run_task(ws, enqueue(ws, "demo", "experiment_plan", {"input": "одна плата, 500 снимков"}))
     assert res["error"] is None and res["accepted"], res
     plan = project.artifact("experiment_plan")

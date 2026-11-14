@@ -80,6 +80,14 @@ class Project:
             raise FileNotFoundError(f"каталог проекта {slug} отсутствует: {row['path']}")
         return cls(ws, row["path"])
 
+    def set_title_from(self, topic: str) -> None:
+        """Заголовок статьи из темы, если его ещё нет: первая строка, не длиннее 120 знаков, по границе слова."""
+        if self.manifest.get("title") or not topic.strip():
+            return
+        line = topic.strip().splitlines()[0]
+        self.manifest["title"] = line if len(line) <= 120 else line[:120].rsplit(" ", 1)[0] + "…"
+        self.save_manifest()
+
     def save_manifest(self) -> None:
         self.manifest_path.write_text(yaml.safe_dump(self.manifest, allow_unicode=True, sort_keys=False),
                                       encoding="utf-8")
@@ -145,6 +153,10 @@ class Project:
             raise FileNotFoundError(type_)
         if decision in ("approve", "override") and art.meta.get("ab"):
             raise ValueError("сначала выбор A/B: какая из двух версий остаётся")
+        blockers = int((art.meta.get("review_summary") or {}).get("blockers") or 0)
+        if decision == "approve" and blockers:
+            raise ValueError(f"{type_} v{art.version}: блокеров {blockers} — исправьте и перепроверьте "
+                             "или одобрите через override с причиной")
         if decision in ("approve", "override"):
             art.status = "approved"
             art.meta.update(approved_by="human", approved_at=time.strftime("%Y-%m-%dT%H:%M:%S"),
