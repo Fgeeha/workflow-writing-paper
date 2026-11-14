@@ -1,8 +1,8 @@
 {% extends "base.html" %}
-{% block title %}{{ project.slug }} · {{ art.type }} v{{ art.version }}{% endblock %}
+{% block title %}{{ project.slug }} · {{ art.type|ru }} v{{ art.version }}{% endblock %}
 {% block content %}
 <p><a href="/projects/{{ project.slug }}">← {{ project.slug }}</a></p>
-<h1>{{ art.type }} v{{ art.version }} <span class="badge badge-{{ art.status }}">{{ art.status }}</span></h1>
+<h1>{{ art.type|ru }} v{{ art.version }} <span class="badge badge-{{ art.status }}">{{ art.status|ru }}</span></h1>
 <p class="muted">Автор: {{ art.meta.created_by.role }} · {{ art.meta.created_by.provider }} ({{ art.meta.created_by.family }}).
   Версии: {% for v in versions %}<a href="?version={{ v }}">{% if v == art.version %}<b>v{{ v }}</b>{% else %}v{{ v }}{% endif %}</a> {% endfor %}
   {% if art.meta.approved_at %}· одобрен {{ art.meta.approved_at }}{% if art.meta.override_reason %} (override: {{ art.meta.override_reason }}){% endif %}{% endif %}</p>

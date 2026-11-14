@@ -25,7 +25,7 @@
   <tr><th>проект</th><th>артефакт</th><th class="num">версия</th><th class="num">судьи</th><th class="num">блокеры</th><th></th></tr>
   {% for p in pending %}
   <tr>
-    <td><a href="/projects/{{ p.slug }}">{{ p.slug }}</a></td><td>{{ p.type }}</td><td class="num">v{{ p.version }}</td>
+    <td><a href="/projects/{{ p.slug }}">{{ p.slug }}</a></td><td>{{ p.type|ru }}</td><td class="num">v{{ p.version }}</td>
     <td class="num">{% if p.summary.get('min_overall') is not none %}min {{ '%.1f'|format(p.summary.min_overall) }} / порог {{ p.summary.threshold }}{% else %}—{% endif %}</td>
     <td class="num {{ 'bad' if p.summary.blockers }}">{{ p.summary.get('blockers', '—') }}</td>
     <td><a href="/projects/{{ p.slug }}/artifacts/{{ p.type }}">решить</a></td>
@@ -36,12 +36,12 @@
 
 {% if stale %}
 <h2>Требуют пересмотра (устарели после правки предыдущей стадии)</h2>
-<ul>{% for s in stale %}<li><a href="/projects/{{ s.slug }}/artifacts/{{ s.type }}">{{ s.slug }} · {{ s.type }} v{{ s.version }}</a></li>{% endfor %}</ul>
+<ul>{% for s in stale %}<li><a href="/projects/{{ s.slug }}/artifacts/{{ s.type }}">{{ s.slug }} · {{ s.type|ru }} v{{ s.version }}</a></li>{% endfor %}</ul>
 {% endif %}
 
 <h2>Задачи</h2>
 {% if running %}
-<ul>{% for t in running %}<li>#{{ t.id }} {{ t.project }} · {{ t.stage }} — <b>{{ t.status }}</b> <span class="muted">{{ t.payload }}</span></li>{% endfor %}</ul>
+<ul>{% for t in running %}<li>#{{ t.id }} {{ t.project }} · {{ t.stage|ru }} — <b>{{ t.status|ru }}</b> <span class="muted">{{ t.payload }}</span></li>{% endfor %}</ul>
 {% else %}<p class="muted">Очередь пуста.</p>{% endif %}
 
 {% if failed %}
@@ -49,7 +49,7 @@
 <table>
   <tr><th>#</th><th>проект</th><th>стадия</th><th>причина</th><th>когда</th></tr>
   {% for t in failed %}
-  <tr><td>{{ t.id }}</td><td><a href="/projects/{{ t.project }}">{{ t.project }}</a></td><td>{{ t.stage }}</td>
+  <tr><td>{{ t.id }}</td><td><a href="/projects/{{ t.project }}">{{ t.project }}</a></td><td>{{ t.stage|ru }}</td>
       <td class="bad">{{ t.error }}</td><td class="muted">{{ t.finished_at }}</td></tr>
   {% endfor %}
 </table>

@@ -168,6 +168,7 @@ def test_web_pages_end_to_end(tmp_path):
     assert r.status_code == 303
     page = client.get("/projects/web-demo").text
     assert "novelty" in page and "pending" in page
+    assert "<td>новизна</td>" in page and "не начата" in page  # подписи стадий и состояний — по-русски
     r = client.post("/projects/web-demo/run/novelty", data={"input": "Идея."}, follow_redirects=False)
     assert r.status_code == 303 and run_pending(ws) == 1
     assert client.post("/projects/web-demo/run/draft", data={"section": "Метод"}).status_code == 400  # гейт

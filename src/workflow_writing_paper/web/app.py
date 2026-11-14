@@ -19,6 +19,7 @@ from ..core import Workspace
 from ..core.engine import Worker
 from ..eval import run_bench, summary
 from ..providers import build_pool, role_providers
+from .labels import ru
 from .library import register_library
 from .projects import register
 
@@ -33,6 +34,7 @@ def create_app(ws: Workspace | None = None, worker: bool = True) -> FastAPI:
         Worker(ws).start()
     app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")  # htmx — офлайн
     templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
+    templates.env.filters["ru"] = ru
     jobs: dict[str, dict[str, Any]] = {}
 
     def render(request: Request, name: str, **ctx: Any) -> HTMLResponse:
