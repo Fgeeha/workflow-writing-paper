@@ -64,6 +64,16 @@
 
 <h2>Текст</h2>
 <pre>{{ art.body }}</pre>
+{% if art.version == current.version and art.type != 'corpus' %}
+<details id="edit">
+  <summary><b>Редактировать текст</b> — сохранится как v{{ art.version + 1 }}, затем перепроверьте судьями</summary>
+  <form method="post" action="/projects/{{ project.slug }}/artifacts/{{ art.type }}/edit">
+    <input type="hidden" name="version" value="{{ art.version }}">
+    <textarea name="body" rows="30" style="width:100%;font-family:monospace">{{ art.body }}</textarea>
+    <button class="primary">сохранить новую версию</button>
+  </form>
+</details>
+{% endif %}
 
 {% if diff %}
 <h2>Отличия от v{{ art.version - 1 }}</h2>

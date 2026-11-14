@@ -194,6 +194,23 @@ def register(app: FastAPI, ws: Workspace, render: Render) -> None:
             raise HTTPException(400, str(e)) from e
         return RedirectResponse(f"/projects/{slug}/artifacts/{type_}", status_code=303)
 
+    @app.post("/projects/{slug}/artifacts/{type_}/edit")
+    async def edit_route(slug: str, type_: str, request: Request) -> RedirectResponse:
+        """Ручная правка текста: новая версия от человека, проверки сбрасываются."""
+        form = await request.form()
+        body = str(form.get("body") or "").replace("\r\n", "\n")
+        project = _open(ws, slug)
+        current = project.artifact(type_)
+        if current is None or type_ == "corpus":
+            raise HTTPException(400, f"артефакт {type_} нельзя править вручную")
+        if str(form.get("version")) != str(current.version):
+            raise HTTPException(409, f"пока вы правили, появилась v{current.version} — откройте её и повторите")
+        if not body.strip():
+            raise HTTPException(400, "пустой текст")
+        if body.strip() != current.body.strip():
+            project.write_artifact(type_, body, {"role": "human", "provider": "human", "family": "human", "call": None})
+        return RedirectResponse(f"/projects/{slug}/artifacts/{type_}", status_code=303)
+
     @app.post("/projects/{slug}/artifacts/{type_}/ab/{chosen}")
     def ab_choose(slug: str, type_: str, chosen: str) -> RedirectResponse:
         """Выбор автора в живом A/B: версия a или b становится текущей."""

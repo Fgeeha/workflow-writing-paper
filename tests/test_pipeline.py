@@ -180,6 +180,19 @@ def test_web_pages_end_to_end(tmp_path):
     assert r.status_code == 303
     assert client.post("/projects/web-demo/artifacts/novelty/to-eval", follow_redirects=False).status_code == 303
     assert list((ws.root / "eval" / "tasks" / "ideator").glob("ideator-web-demo-*.yaml"))
+    # ручная правка: новая версия от человека; правка устаревшей версии — 409
+    assert "Редактировать текст" in client.get("/projects/web-demo/artifacts/novelty").text
+    r = client.post("/projects/web-demo/artifacts/novelty/edit", data={"version": "1", "body": "Правка.\r\nВторая."},
+                    follow_redirects=False)
+    from workflow_writing_paper.core.project import Project
+    edited = Project(ws, ws.root / "projects" / "web-demo").artifact("novelty")
+    assert r.status_code == 303 and edited.version == 2 and edited.body.startswith("Правка.\nВторая.")
+    assert edited.meta["created_by"]["role"] == "human" and edited.status == "draft"
+    assert client.post("/projects/web-demo/artifacts/novelty/edit", data={"version": "1", "body": "x"}).status_code == 409
+    assert client.post("/projects/web-demo/artifacts/corpus/edit", data={"version": "1", "body": "x"}).status_code == 400
+    edited.status = "in_review"  # на проверке, но судьи ещё не оценивали — главная не должна падать
+    Project(ws, ws.root / "projects" / "web-demo").update_artifact(edited)
+    assert client.get("/").status_code == 200
     r = client.post("/projects/web-demo/registry", data={"key": "f1", "value": "0,82", "unit": ""},
                     follow_redirects=False)
     assert r.status_code == 303 and "0.82" in client.get("/projects/web-demo/registry").text
