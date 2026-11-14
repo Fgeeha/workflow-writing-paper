@@ -194,6 +194,13 @@ def test_web_pages_end_to_end(tmp_path):
     edited.status = "in_review"  # на проверке, но судьи ещё не оценивали — главная не должна падать
     Project(ws, ws.root / "projects" / "web-demo").update_artifact(edited)
     assert client.get("/").status_code == 200
+    # файлы статьи: только из белого списка, несобранный — 404
+    assert client.get("/projects/web-demo/files/paper.pdf").status_code == 404
+    assert client.get("/projects/web-demo/files/paper-workflow.yaml").status_code == 404
+    assert client.get("/projects/web-demo/files/..%2F..%2Fenv").status_code == 404
+    (ws.root / "projects" / "web-demo" / "paper.pdf").write_bytes(b"%PDF-1.4 test")
+    r = client.get("/projects/web-demo/files/paper.pdf")
+    assert r.status_code == 200 and r.headers["content-type"] == "application/pdf" and r.content.startswith(b"%PDF")
     r = client.post("/projects/web-demo/registry", data={"key": "f1", "value": "0,82", "unit": ""},
                     follow_redirects=False)
     assert r.status_code == 303 and "0.82" in client.get("/projects/web-demo/registry").text

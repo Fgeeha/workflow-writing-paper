@@ -11,7 +11,7 @@ from typing import Any
 
 import yaml
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 from ..core import Artifact, Project, Workspace
 from ..core.engine import enqueue
@@ -23,6 +23,8 @@ from ..registry import add_manual
 from ..roles import NOT_YET
 
 Render = Callable[..., HTMLResponse]
+
+EXPORTS = ("paper.pdf", "paper.docx", "paper.md")  # что отдаётся по /files — только это
 
 SETTINGS_DIRS = ("prompts", "rubrics", "journals", "templates", "eval/tasks", "style", "skills", "library/refs.bib")
 ARTIFACT_TYPES = tuple(dict.fromkeys(STAGE_ARTIFACT.values()))
@@ -178,8 +180,20 @@ def register(app: FastAPI, ws: Workspace, render: Render) -> None:
         if prev:
             diff = "\n".join(difflib.unified_diff(prev.body.splitlines(), art.body.splitlines(),
                                                   f"v{prev.version}", f"v{art.version}", lineterm="", n=2))
+        exports = [n for n in EXPORTS if (project.path / n).is_file()] if type_ == "paper" else []
         return render(request, "artifact.html", project=project, art=art, current=current,
-                      reviews=_reviews(project, art), diff=diff, versions=list(range(1, current.version + 1)))
+                      reviews=_reviews(project, art), diff=diff, versions=list(range(1, current.version + 1)),
+                      exports=exports)
+
+    @app.get("/projects/{slug}/files/{name}")
+    def export_file(slug: str, name: str) -> FileResponse:
+        """Собранная статья: PDF показывается в браузере, остальное скачивается."""
+        if name not in EXPORTS:
+            raise HTTPException(404, "такого файла нет")
+        path = _open(ws, slug).path / name
+        if not path.is_file():
+            raise HTTPException(404, f"{name} ещё не собран — запустите сборку или wwp export")
+        return FileResponse(path, filename=name if not name.endswith(".pdf") else None)
 
     @app.post("/projects/{slug}/artifacts/{type_}/decide")
     async def decide_route(slug: str, type_: str, request: Request) -> RedirectResponse:
