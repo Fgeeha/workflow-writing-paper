@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="470" viewBox="0 0 1200 470" role="img" aria-labelledby="title desc">
+  <title id="title">Стадии конвейера</title>
+  <desc id="desc">Путь от темы до paper.docx: collect, literature, novelty, experiment_plan, experiments, draft, review, assembly. После стадий артефакт проверяют два судьи других семейств и детерминированный checker, затем решение принимает автор.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#6B675E"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="470" rx="24" fill="#F7F4EC"/>
+  <text x="56" y="64" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" letter-spacing="2" fill="#6B675E">ОТ ТЕМЫ ДО PAPER.DOCX</text>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="18" fill="#6B675E">
+    <g transform="translate(56 92)">
+      <rect width="200" height="110" rx="10" fill="#FFFFFF" stroke="#1C1B19" stroke-width="2"/>
+      <text x="16" y="34" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700" fill="#1C1B19">тема</text>
+      <text x="16" y="66">или своя</text><text x="16" y="90">новизна</text>
+    </g>
+    <g transform="translate(278 92)">
+      <rect width="200" height="110" rx="10" fill="#FFFFFF" stroke="#D9D3C4" stroke-width="2"/>
+      <text x="16" y="34" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700" fill="#1C1B19">collect</text>
+      <text x="16" y="66">корпус из</text><text x="16" y="90">OpenAlex</text>
+    </g>
+    <g transform="translate(500 92)">
+      <rect width="200" height="110" rx="10" fill="#FFFFFF" stroke="#D9D3C4" stroke-width="2"/>
+      <text x="16" y="34" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700" fill="#1C1B19">literature</text>
+      <text x="16" y="66">обзор только</text><text x="16" y="90">по refs.bib</text>
+    </g>
+    <g transform="translate(722 92)">
+      <rect width="200" height="110" rx="10" fill="#FFFFFF" stroke="#D9D3C4" stroke-width="2"/>
+      <text x="16" y="34" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700" fill="#1C1B19">novelty</text>
+      <text x="16" y="66">ideator ⇄ critic,</text><text x="16" y="90">пробелы обзора</text>
+    </g>
+    <g transform="translate(944 92)">
+      <rect width="200" height="110" rx="10" fill="#FFFFFF" stroke="#D9D3C4" stroke-width="2"/>
+      <text x="16" y="34" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700" fill="#1C1B19" textLength="170" lengthAdjust="spacingAndGlyphs">experiment_plan</text>
+      <text x="16" y="66">метрики, базовые</text><text x="16" y="90">линии, ключи</text>
+    </g>
+
+    <g transform="translate(56 262)">
+      <rect width="200" height="110" rx="10" fill="#FFFFFF" stroke="#D9D3C4" stroke-width="2"/>
+      <text x="16" y="34" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700" fill="#1C1B19">experiments</text>
+      <text x="16" y="66">ваши сценарии →</text><text x="16" y="90">results.json</text>
+    </g>
+    <g transform="translate(278 262)">
+      <rect width="200" height="110" rx="10" fill="#FFFFFF" stroke="#D9D3C4" stroke-width="2"/>
+      <text x="16" y="34" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700" fill="#1C1B19">draft</text>
+      <text x="16" y="66">разделы по</text><text x="16" y="90">профилю журнала</text>
+    </g>
+    <g transform="translate(500 262)">
+      <rect width="200" height="110" rx="10" fill="#FFFFFF" stroke="#D9D3C4" stroke-width="2"/>
+      <text x="16" y="34" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700" fill="#1C1B19">review</text>
+      <text x="16" y="66">весь черновик</text><text x="16" y="90">глазами судей</text>
+    </g>
+    <g transform="translate(722 262)">
+      <rect width="200" height="110" rx="10" fill="#FFFFFF" stroke="#D9D3C4" stroke-width="2"/>
+      <text x="16" y="34" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700" fill="#1C1B19">assembly</text>
+      <text x="16" y="66">pandoc</text><text x="16" y="90">--citeproc</text>
+    </g>
+    <g transform="translate(944 262)">
+      <rect width="200" height="110" rx="10" fill="#1C1B19"/>
+      <text x="16" y="34" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700" fill="#F7F4EC">paper.docx</text>
+      <text x="16" y="66" fill="#C9C3B5">paper.md, PDF,</text><text x="16" y="90" fill="#C9C3B5">история в git</text>
+    </g>
+  </g>
+
+  <g stroke="#6B675E" stroke-width="2" fill="none" marker-end="url(#arrow)">
+    <path d="M256 147 H276"/>
+    <path d="M478 147 H498"/>
+    <path d="M700 147 H720"/>
+    <path d="M922 147 H942"/>
+    <path d="M1044 202 V232 H156 V258"/>
+    <path d="M256 317 H276"/>
+    <path d="M478 317 H498"/>
+    <path d="M700 317 H720"/>
+    <path d="M922 317 H942"/>
+  </g>
+  <g fill="#2F6B3F">
+    <rect x="483" y="141" width="12" height="12" transform="rotate(45 489 147)"/>
+    <rect x="705" y="141" width="12" height="12" transform="rotate(45 711 147)"/>
+    <rect x="927" y="141" width="12" height="12" transform="rotate(45 933 147)"/>
+    <rect x="594" y="226" width="12" height="12" transform="rotate(45 600 232)"/>
+    <rect x="705" y="311" width="12" height="12" transform="rotate(45 711 317)"/>
+  </g>
+
+  <g transform="translate(56 404)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="20" fill="#1C1B19">
+    <rect x="0" y="2" width="14" height="14" fill="#2F6B3F" transform="rotate(45 7 9)"/>
+    <text x="30" y="16">гейт: 2 судьи других семейств + checker без модели →</text>
+    <text x="30" y="44">решение автора: <tspan font-family="ui-monospace, SFMono-Regular, Menlo, monospace">approve · override · return · reject</tspan></text>
+  </g>
+</svg>

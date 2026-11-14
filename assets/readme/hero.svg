@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+  <title id="title">workflow-writing-paper</title>
+  <desc id="desc">Конвейер научной статьи: модели пишут, судьи других семейств проверяют, автор принимает. Справа фрагмент черновика: число подтверждено реестром results.json, ссылка из refs.bib принята, выдуманная ссылка помечена блокером.</desc>
+
+  <rect width="1200" height="420" rx="24" fill="#F7F4EC"/>
+  <line x1="56" y1="56" x2="1144" y2="56" stroke="#D9D3C4" stroke-width="2"/>
+
+  <g id="title-block" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" fill="#1C1B19">
+    <text x="56" y="104" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" letter-spacing="2" fill="#6B675E">КОНВЕЙЕР НАУЧНОЙ СТАТЬИ</text>
+    <text x="56" y="172" font-family="Georgia, 'PT Serif', 'DejaVu Serif', serif" font-size="52" font-weight="700">workflow-</text>
+    <text x="56" y="230" font-family="Georgia, 'PT Serif', 'DejaVu Serif', serif" font-size="52" font-weight="700">writing-paper</text>
+    <text x="56" y="284" font-size="24">От темы до <tspan font-family="ui-monospace, SFMono-Regular, Menlo, monospace">paper.docx</tspan>: модели пишут,</text>
+    <text x="56" y="316" font-size="24">судьи других семейств проверяют,</text>
+    <text x="56" y="348" font-size="24">решение принимает автор.</text>
+    <text x="56" y="388" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#6B675E">$ uv run wwp serve   ·   v0.5   ·   MIT</text>
+  </g>
+
+  <g id="project-proof" transform="translate(640 84)" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <rect x="8" y="8" width="496" height="300" rx="12" fill="#E6E0D2"/>
+    <rect width="496" height="300" rx="12" fill="#FFFFFF" stroke="#D9D3C4" stroke-width="2"/>
+    <text x="28" y="44" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#6B675E">artifacts/draft.md</text>
+    <text x="28" y="88" font-family="Georgia, 'PT Serif', 'DejaVu Serif', serif" font-size="24" font-weight="700" fill="#1C1B19">Эксперимент</text>
+
+    <text x="28" y="128" font-size="20" fill="#1C1B19">MobileNetV2 содержит <tspan font-weight="700" fill="#2F6B3F">3.505 M</tspan> параметров</text>
+    <text x="28" y="160" font-size="20" fill="#1C1B19">и <tspan font-weight="700" fill="#2F6B3F">300.8 M</tspan> MAC <tspan font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#2F6B3F">[@sandler2018]</tspan>,</text>
+    <text x="28" y="192" font-size="20" fill="#1C1B19">что меньше, чем у <tspan id="fake" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#B4362A">[@smith2031]</tspan></text>
+
+    <line x1="20" y1="218" x2="476" y2="218" stroke="#EEE9DD" stroke-width="2"/>
+    <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">
+      <text x="28" y="250" fill="#2F6B3F">✓ числа есть в results.json</text>
+      <text x="28" y="280" fill="#B4362A">✗ smith2031 нет в refs.bib — блокер</text>
+    </g>
+  </g>
+</svg>
